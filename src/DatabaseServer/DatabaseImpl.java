@@ -5,9 +5,7 @@ import DatabaseServer.Interfaces.IDataBase;
 import java.io.*;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
@@ -60,7 +58,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         // carregar o estado das lojas para memória
 
         // ir ao log e repôr o estado correto
-        
+
     }
 
     /**
@@ -96,5 +94,60 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         }
 
         this.shops.put(shopID, currShopProds);
+    }
+
+    @Override
+    public List<Product> getShopProducts(int shopID) throws RemoteException {
+        return shops.get(shopID);
+    }
+
+    @Override
+    public String addReservation(int shopID, int productID, int quantity, int clientID) throws RemoteException {
+        /* Reservations don't go to logs, they don't matter if the system goes down and back up again */
+        /* Reservations require some kind of thread "sleeping" for 15s to remove the reservation
+        *  if the reservation goes thru then this thread should be killed or something */
+
+
+        return null;
+    }
+
+    private void superviseTheReservation(Reservation reservation) {
+        Timer timer = new Timer();
+        reservation.timer = timer;
+        reservation.timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                int counter = 0;
+                /* A complicar demasiado isto, parece-me. Isto está dentro de uma nova classe que não conhece o reservations */
+                List<Reservation> clientReservations = this.reservations.get(reservation.getClientID());
+                Reservation res = clientReservations.get(counter);
+                while(!reservation.equals(res)) {
+                    counter++;
+                    res = clientReservations.get(counter);
+                }
+
+                clientReservations.remove(counter);
+            }
+        }, 15);
+    }
+
+    @Override
+    public String buyProduct(int shopID, int productID, int quantity, int clientID) throws RemoteException {
+        return null;
+    }
+
+    @Override
+    public boolean removeReservation(int clientID, int shopID, int productID) throws RemoteException {
+        return false;
+    }
+
+    @Override
+    public List<Reservation> getClientReservations(int clientID) throws RemoteException {
+        return null;
+    }
+
+    @Override
+    public boolean cancelAllReservations(int clientID) throws RemoteException {
+        return false;
     }
 }

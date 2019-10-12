@@ -1,11 +1,14 @@
 package DatabaseServer;
 
+import java.util.Timer;
+
 public class Reservation {
 
     private int clientID;
     private int shopID;
     private int productID;
     private int quantity;
+    public Timer timer;
 
     public Reservation(int clientID, int shopID, int productID, int quantity) {
         this.clientID = clientID;
@@ -44,5 +47,16 @@ public class Reservation {
 
     public void setQuantity(int quantity) {
         this.quantity = quantity;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if(obj instanceof Reservation)
+            if(this.clientID == ((Reservation) obj).getClientID())
+                if(this.shopID == ((Reservation) obj).getShopID())
+                    if(this.productID == ((Reservation) obj).getProductID())
+                        return this.quantity == ((Reservation) obj).getQuantity();
+
+        return false;
     }
 }
