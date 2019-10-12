@@ -3,14 +3,12 @@ package DatabaseServer;
 public class Reservation {
 
     private int clientID;
-    private String productsKey;
     private int shopID;
-    private String productID;
+    private int productID;
     private int quantity;
 
-    public Reservation(int clientID, String productsKey, int shopID, String productID, int quantity) {
+    public Reservation(int clientID, int shopID, int productID, int quantity) {
         this.clientID = clientID;
-        this.productsKey = productsKey;
         this.shopID = shopID;
         this.productID = productID;
         this.quantity = quantity;
@@ -24,14 +22,6 @@ public class Reservation {
         this.clientID = clientID;
     }
 
-    public String getProductsKey() {
-        return productsKey;
-    }
-
-    public void setProductsKey(String productsKey) {
-        this.productsKey = productsKey;
-    }
-
     public int getShopID() {
         return shopID;
     }
@@ -40,11 +30,11 @@ public class Reservation {
         this.shopID = shopID;
     }
 
-    public String getProductID() {
+    public int getProductID() {
         return productID;
     }
 
-    public void setProductID(String productID) {
+    public void setProductID(int productID) {
         this.productID = productID;
     }
 

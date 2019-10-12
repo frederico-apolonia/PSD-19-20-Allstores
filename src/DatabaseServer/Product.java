@@ -5,18 +5,27 @@ public class Product {
     private static final int DEFAULT_STARTING_STOCK = 10;
 
     private int shopID;
-    private String productID;
+    private int productID;
     private int available;
     private int sold;
     private int reserved;
 
-    public Product(int shopID, String productID) {
+    public Product(int shopID, int productID) {
         this.shopID = shopID;
         this.productID = productID;
 
         // o stock default
         this.available = DEFAULT_STARTING_STOCK;
         this.sold = 0;
+        this.reserved = 0;
+    }
+
+    public Product(int shopID, int productID, int available, int sold) {
+        this.shopID = shopID;
+        this.productID = productID;
+        this.available = available;
+        this.sold = sold;
+
         this.reserved = 0;
     }
 
@@ -35,7 +44,7 @@ public class Product {
     /**
      * @return unique key for each map entry
      */
-    public String getProductsKey() {
+    public int getProductsKey() {
         return this.shopID + this.productID;
     }
 
@@ -43,11 +52,11 @@ public class Product {
         this.shopID = shopID;
     }
 
-    public String getProductID() {
+    public int getProductID() {
         return productID;
     }
 
-    public void setProductID(String productID) {
+    public void setProductID(int productID) {
         this.productID = productID;
     }
 

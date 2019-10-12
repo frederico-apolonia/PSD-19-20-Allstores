@@ -2,17 +2,17 @@ package DatabaseServer;
 
 import DatabaseServer.Interfaces.IDataBase;
 
-import java.io.File;
+import java.io.*;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
     // product ids are the first 20 letters of the alphabet
-    private static final String PRODUCT_IDS = "abcdefgijklmnopqrstu";
-    private static final int NUM_PRODUCT_IDS = PRODUCT_IDS.length();
+    private static final int NUM_PRODUCT_IDS = 20;
     private static final int NUMBER_OF_STORES = 600;
 
     private static final String FILE_SEPARATOR = File.separator;
@@ -20,11 +20,15 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
     private static final String SERVER_PATH = System.getProperty("user.home")
             + FILE_SEPARATOR + "AllstoresDB" + FILE_SEPARATOR;
 
-    private HashMap<String, Product> shopProducts = new HashMap<>();
-    private ArrayList<Reservation> reservations = new ArrayList<>();
+    private HashMap<Integer, List<Product>> shops = new HashMap<>();
+    private HashMap<Integer, List<Reservation>> reservations = new HashMap<>();
 
-    public DatabaseImpl() throws RemoteException {
-        initDataBase();
+    public DatabaseImpl() throws Exception {
+        try {
+            initDataBase();
+        } catch (IOException e) {
+            e.getStackTrace();
+        }
     }
 
     /**
@@ -32,32 +36,65 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
      * Checks first if there is a previous state of the database then loads it, else
      * creates a new one from scratch (600 stores, 20 products ea)
      */
-    private void initDataBase() {
-        // initialize products
-        shopProducts = new HashMap<>();
+    private void initDataBase() throws IOException {
 
         File serverDir = new File(SERVER_PATH);
         // check if there is a previous version of the server
         System.out.println("Checking if there is a previous state of the database...");
         if (serverDir.exists()) {
-            // load files
+            System.out.println("Version found! Loading the latest saved state");
+            loadShops();
         } else {
             System.out.println("No version found, starting from scratch...");
             for (int shopID = 0; shopID < NUMBER_OF_STORES; shopID++) {
-                Product[] currShopProds = new Product[NUM_PRODUCT_IDS];
-
-                for(int j = 0; j < NUM_PRODUCT_IDS; j++) {
-                    Product p = new Product(shopID, String.format("%s", PRODUCT_IDS.charAt(j)));
-                    String shopProductsKey = p.getProductsKey();
-                    shopProducts.put(shopProductsKey, p);
-                    System.out.println(String.format("Added product %s to " +
-                            "shop %d with quantity %d", p.getProductID(), shopID,
-                            p.getAvailable()));
-                    currShopProds[j] = p;
-                }
-                // initialize shop file
+                generateNewShop(shopID);
             }
+            System.out.println("All shops generated! Writing stores to disk...");
+            writeStoresToDisk();
         }
 
+    }
+
+    private void loadShops() {
+        // todo
+        // carregar o estado das lojas para memória
+
+        // ir ao log e repôr o estado correto
+        
+    }
+
+    /**
+     * Writes all stores to disk
+     */
+    private void writeStoresToDisk() throws IOException {
+        for (int shop : this.shops.keySet()) {
+            writeStoreToDisk(shop, this.shops.get(shop));
+        }
+    }
+
+    /**
+     * Write a store to disk on file <storeID>.shop
+     * @param shopID
+     * @param products
+     */
+    private void writeStoreToDisk(int shopID, List<Product> products) throws IOException {
+        String shopPath = SERVER_PATH + shopID + ".shop";
+        BufferedWriter writer = new BufferedWriter(new FileWriter(shopPath));
+        for(Product p : products) {
+            writer.write(String.format("%d %d %d\n", p.getProductID(), p.getAvailable(), p.getSold()));
+        }
+    }
+
+    private void generateNewShop(int shopID) {
+        List<Product> currShopProds = new ArrayList<>();
+
+        for(int productID = 0; productID < NUM_PRODUCT_IDS; productID++) {
+            Product p = new Product(shopID, productID);
+            currShopProds.add(p);
+            System.out.println(String.format("Added product %s to " +
+                            "shop %d with quantity %d", p.getProductID(), shopID, p.getAvailable()));
+        }
+
+        this.shops.put(shopID, currShopProds);
     }
 }
