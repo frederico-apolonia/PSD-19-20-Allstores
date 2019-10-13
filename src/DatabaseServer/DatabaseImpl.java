@@ -111,22 +111,17 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         return null;
     }
 
-    private void superviseTheReservation(Reservation reservation) {
+    private void superviseReservation(Reservation reservation) {
         Timer timer = new Timer();
         reservation.timer = timer;
         reservation.timer.schedule(new TimerTask() {
             @Override
             public void run() {
-                int counter = 0;
-                /* A complicar demasiado isto, parece-me. Isto está dentro de uma nova classe que não conhece o reservations */
-                List<Reservation> clientReservations = this.reservations.get(reservation.getClientID());
-                Reservation res = clientReservations.get(counter);
-                while(!reservation.equals(res)) {
-                    counter++;
-                    res = clientReservations.get(counter);
+                try {
+                    removeReservation(reservation.getClientID(), reservation.getShopID(), reservation.getProductID());
+                } catch (RemoteException e) {
+                    e.printStackTrace();
                 }
-
-                clientReservations.remove(counter);
             }
         }, 15);
     }
@@ -138,16 +133,47 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
     @Override
     public boolean removeReservation(int clientID, int shopID, int productID) throws RemoteException {
+        int counter = 0;
+        List<Reservation> clientReservations = this.reservations.get(clientID);
+        Reservation res = clientReservations.get(counter);
+
+        while(!(res.getShopID() == shopID) && !(res.getProductID() == productID) ) {
+            counter++;
+            if(counter > clientReservations.size()) {
+                res = null;
+                break;
+            }
+            res = clientReservations.get(counter);
+        }
+
+        if(res != null) {
+            // cancel the timer
+            res.timer.cancel();
+            clientReservations.remove(counter);
+            return true;
+        }
         return false;
     }
 
     @Override
     public List<Reservation> getClientReservations(int clientID) throws RemoteException {
-        return null;
+        return this.reservations.get(clientID);
     }
 
     @Override
     public boolean cancelAllReservations(int clientID) throws RemoteException {
+
+        List<Reservation> clientReservations = this.reservations.get(clientID);
+
+        if(clientReservations != null) {
+            for(Reservation r : clientReservations) {
+                // cancel all timers
+                r.timer.cancel();
+            }
+            this.reservations.remove(clientID);
+            return true;
+        }
+
         return false;
     }
 }
