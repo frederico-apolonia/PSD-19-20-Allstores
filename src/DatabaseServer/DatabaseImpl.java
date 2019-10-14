@@ -104,16 +104,45 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
     @Override
     public String addReservation(int shopID, int productID, int quantity, int clientID) throws RemoteException {
         /* Reservations don't go to logs, they don't matter if the system goes down and back up again */
-        /* Reservations require some kind of thread "sleeping" for 15s to remove the reservation
-        *  if the reservation goes thru then this thread should be killed or something */
 
+        // check if the client already had a reservation for this product
+        Reservation r = findClientReservation(clientID, shopID, productID);
+        if(r != null) {
+            // remove the previous clock and update the quantity
+            r.timer.cancel();
+            r.setQuantity(r.getQuantity() + quantity);
+        } else {
+            r = new Reservation(clientID, shopID, productID, quantity);
+        }
 
-        return null;
+        // update product information to match this new reservation
+        int remainingQty = productUpdateReservation(shopID, productID, quantity, true);
+        //
+        List<Reservation> clientReservations = this.reservations.get(clientID);
+        if(clientReservations != null) {
+            clientReservations.add(r);
+        }
+        // arm the 15s clock
+        superviseReservation(r);
+
+        return String.format("<RESERVED> %d", remainingQty);
+    }
+
+    private Reservation findClientReservation(int clientID, int shopID, int productID) {
+        Reservation result = null;
+        for(Reservation r : this.reservations.get(clientID)) {
+            if(r.getShopID() == shopID && r.getProductID() == productID) {
+                result = r;
+                break;
+            }
+        }
+        return result;
     }
 
     private void superviseReservation(Reservation reservation) {
         Timer timer = new Timer();
         reservation.timer = timer;
+        // set a schedule to remove the reservation in 15 seconds
         reservation.timer.schedule(new TimerTask() {
             @Override
             public void run() {
@@ -128,7 +157,39 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
     @Override
     public String buyProduct(int shopID, int productID, int quantity, int clientID) throws RemoteException {
-        return null;
+
+        // first, check if the client already has a reservation for this product
+        Reservation r = findClientReservation(clientID, shopID, productID);
+        if(r != null) {
+            // if so, disarm the clock, subtract the qty, if > 0, arm the clock again, else remove it. save the
+            // qty difference (reserve.qty - quantity)
+            int remainingReservationQuantity = r.getQuantity() - quantity;
+            removeReservation(r.getClientID(), r.getShopID(), r.getProductID());
+
+            if(remainingReservationQuantity > 0) {
+                addReservation(shopID, productID, remainingReservationQuantity, clientID);
+            }
+
+        }
+        // update the product information (reservation space is already taken care of)
+        List<Product> shopProducts = this.shops.get(shopID);
+        int remainingAvailable = p.p.getAvailable() - quantity;
+        for(Product p : shopProducts) {
+            if(p.getProductID() == productID && p.getShopID() == shopID) {
+                p.setAvailable(remainingAvailable);
+                p.setSold(quantity);
+                break;
+            }
+        }
+        // write to log
+        writeBuyToLog(shopID, productID, quantity);
+
+        // return the value to the middle server
+        return String.format("<SOLD> %d", remainingAvailable);
+    }
+
+    private void writeBuyToLog(int shopID, int productID, int quantity) {
+        // todo
     }
 
     @Override
@@ -149,6 +210,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         if(res != null) {
             // cancel the timer
             res.timer.cancel();
+            productUpdateReservation(res.getShopID(), res.getProductID(), res.getQuantity(), false);
             clientReservations.remove(counter);
             return true;
         }
@@ -160,6 +222,35 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         return this.reservations.get(clientID);
     }
 
+    /**
+     *
+     * @param shopID
+     * @param productID
+     * @param reserveQuantity
+     * @param increaseReservation - tells if the reservation quantity increases or not (if someone is making a reservation)
+     * @return remaining quantity available
+     */
+    private int productUpdateReservation(int shopID, int productID, int reserveQuantity, boolean increaseReservation) {
+
+        int result = -1;
+
+        for(Product p : this.shops.get(shopID)) {
+            if(p.getProductID() == productID) {
+                if(increaseReservation) {
+                    p.setAvailable(p.getAvailable() - reserveQuantity);
+                    p.setReserved(p.getReserved() + reserveQuantity);
+                    result = p.getAvailable();
+                } else {
+                    p.setAvailable(p.getAvailable() + reserveQuantity);
+                    p.setReserved(p.getReserved() - reserveQuantity);
+                    result = p.getAvailable();
+                }
+                break;
+            }
+        }
+        return result;
+    }
+
     @Override
     public boolean cancelAllReservations(int clientID) throws RemoteException {
 
@@ -169,6 +260,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
             for(Reservation r : clientReservations) {
                 // cancel all timers
                 r.timer.cancel();
+                productUpdateReservation(r.getShopID(), r.getProductID(), r.getQuantity(), false);
             }
             this.reservations.remove(clientID);
             return true;
