@@ -1,13 +1,13 @@
 package ServerInTheMiddle;
 import java.io.Serializable;
 
-public class Product implements Serializable {
+public class Product2 implements Serializable {
 
 	private String productID; //{A,B,C,D,E,F,G,G,I,J,K,L,M,N,O,P,Q,R,S,T}
 	private int availableQnt;
 	private int soldQnt;
 	
-	public Product(String productID, int availableQnt, int soldQnt) {
+	public Product2(String productID, int availableQnt, int soldQnt) {
 		this.productID = productID;
 		this.availableQnt = availableQnt;
 		this.soldQnt = soldQnt;

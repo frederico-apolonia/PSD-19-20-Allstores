@@ -16,5 +16,19 @@ public interface IDataBase extends Remote {
     public boolean removeReservation(int clientID, int shopID, int productID) throws RemoteException;
     public List<Reservation> getClientReservations(int clientID) throws RemoteException;
     public boolean cancelAllReservations(int clientID) throws RemoteException;
-
+    //acrescentei todos metodos em baixo ------------------------------------------------------------------------------
+    
+    public Reservation findClientReservation(int clientID, int shopID, int productID)throws RemoteException;
+    
+    //parecido a este mas que faça o update automatico pode devolverum boolean a dizer se fez tudo bem ou nao
+    public int productUpdateReservation(int shopID, int productID, int reserveQuantity, boolean increaseReservation) throws RemoteException;
+    
+    //faz update a uma reserva  da uma olhadela na chamada deste metodo pois dava jeito um r.resetTimer()
+    public boolean updateReservation(Reservation r) throws RemoteException;
+    //adiciona uma nova reserva 
+    public boolean addReservation(Reservation r) throws RemoteException;
+    //delete a todas as reservas feitas por um cliente
+    public boolean deleteClientReservations(int clientID) throws RemoteException;
+    
+    //Adiciona mais argumentos se te der mais jeito
 }

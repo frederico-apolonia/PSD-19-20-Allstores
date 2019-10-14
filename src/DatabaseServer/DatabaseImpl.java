@@ -128,7 +128,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         return String.format("<RESERVED> %d", remainingQty);
     }
 
-    private Reservation findClientReservation(int clientID, int shopID, int productID) {
+    public  Reservation findClientReservation(int clientID, int shopID, int productID) {
         Reservation result = null;
         for(Reservation r : this.reservations.get(clientID)) {
             if(r.getShopID() == shopID && r.getProductID() == productID) {
@@ -173,10 +173,11 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         }
         // update the product information (reservation space is already taken care of)
         List<Product> shopProducts = this.shops.get(shopID);
-        int remainingAvailable = p.p.getAvailable() - quantity;
+        int remainingAvailable = 0;
         for(Product p : shopProducts) {
             if(p.getProductID() == productID && p.getShopID() == shopID) {
-                p.setAvailable(remainingAvailable);
+            	remainingAvailable=p.getAvailable() - quantity;
+            	p.setAvailable(remainingAvailable);
                 p.setSold(quantity);
                 break;
             }
@@ -230,7 +231,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
      * @param increaseReservation - tells if the reservation quantity increases or not (if someone is making a reservation)
      * @return remaining quantity available
      */
-    private int productUpdateReservation(int shopID, int productID, int reserveQuantity, boolean increaseReservation) {
+    public  int productUpdateReservation(int shopID, int productID, int reserveQuantity, boolean increaseReservation) {
 
         int result = -1;
 
@@ -268,4 +269,16 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
         return false;
     }
+
+	@Override
+	public boolean updateReservation(Reservation r) throws RemoteException {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	@Override
+	public boolean addReservation(Reservation r) throws RemoteException {
+		// TODO Auto-generated method stub
+		return false;
+	}
 }
