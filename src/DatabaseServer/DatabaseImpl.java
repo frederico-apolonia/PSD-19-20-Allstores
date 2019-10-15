@@ -61,6 +61,19 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
     }
 
+    private void generateNewShop(int shopID) {
+        List<Product> currShopProds = new ArrayList<>();
+
+        for(int productID = 0; productID < NUM_PRODUCT_IDS; productID++) {
+            Product p = new Product(shopID, productID);
+            currShopProds.add(p);
+            System.out.println(String.format("Added product %s to " +
+                    "shop %d with quantity %d", p.getProductID(), shopID, p.getAvailable()));
+        }
+
+        this.shops.put(shopID, currShopProds);
+    }
+
     /**
      * Writes all stores to disk
      */
@@ -83,17 +96,8 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         }
     }
 
-    private void generateNewShop(int shopID) {
-        List<Product> currShopProds = new ArrayList<>();
-
-        for(int productID = 0; productID < NUM_PRODUCT_IDS; productID++) {
-            Product p = new Product(shopID, productID);
-            currShopProds.add(p);
-            System.out.println(String.format("Added product %s to " +
-                            "shop %d with quantity %d", p.getProductID(), shopID, p.getAvailable()));
-        }
-
-        this.shops.put(shopID, currShopProds);
+    private void writeBuyToLog(int shopID, int productID, int quantity) {
+        // todo
     }
 
     @Override
@@ -105,27 +109,25 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
     public String addReservation(int shopID, int productID, int quantity, int clientID) throws RemoteException {
         /* Reservations don't go to logs, they don't matter if the system goes down and back up again */
 
-        // check if the client already had a reservation for this product
-        Reservation r = findClientReservation(clientID, shopID, productID);
-        if(r != null) {
-            // remove the previous clock and update the quantity
-            r.timer.cancel();
-            r.setQuantity(r.getQuantity() + quantity);
-        } else {
-            r = new Reservation(clientID, shopID, productID, quantity);
-        }
+        Reservation r = new Reservation(clientID, shopID, productID, quantity);
 
         // update product information to match this new reservation
-        int remainingQty = productUpdateReservation(shopID, productID, quantity, true);
+        if(!productUpdateReservation(shopID, productID, quantity, true)) {
+            return "<ERRO> AO ALTERAR QUANTIDADE PRODUTO";
+        };
         //
         List<Reservation> clientReservations = this.reservations.get(clientID);
         if(clientReservations != null) {
             clientReservations.add(r);
+        } else {
+            clientReservations = new ArrayList<>();
+            clientReservations.add(r);
+            this.reservations.put(clientID, clientReservations);
         }
         // arm the 15s clock
         superviseReservation(r);
 
-        return String.format("<RESERVED> %d", remainingQty);
+        return "<RESERVED>";
     }
 
     public  Reservation findClientReservation(int clientID, int shopID, int productID) {
@@ -189,10 +191,6 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         return String.format("<SOLD> %d", remainingAvailable);
     }
 
-    private void writeBuyToLog(int shopID, int productID, int quantity) {
-        // todo
-    }
-
     @Override
     public boolean removeReservation(int clientID, int shopID, int productID) throws RemoteException {
         int counter = 0;
@@ -224,14 +222,14 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
     }
 
     /**
-     *
+     * Updates product available and reserved quantities
      * @param shopID
      * @param productID
      * @param reserveQuantity
      * @param increaseReservation - tells if the reservation quantity increases or not (if someone is making a reservation)
      * @return remaining quantity available
      */
-    public  int productUpdateReservation(int shopID, int productID, int reserveQuantity, boolean increaseReservation) {
+    public boolean productUpdateReservation(int shopID, int productID, int reserveQuantity, boolean increaseReservation) throws RemoteException {
 
         int result = -1;
 
@@ -249,7 +247,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
                 break;
             }
         }
-        return result;
+        return result != -1;
     }
 
     @Override

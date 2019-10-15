@@ -104,7 +104,7 @@ public class ClientServerInterfaceImp extends UnicastRemoteObject implements Cli
 				conectionBD.productUpdateReservation(r.getShopID(), r.getProductID(),r.getQuantity(), false);
 			}
 				
-			boolean res= conectionBD.deleteClientReservations(clientID) ;
+			boolean res= conectionBD.cancelAllReservations(clientID) ;
 			if(res)
 				return message.append("Todas as reservas foram deletadas com sucesso !!!").toString();
 			else
