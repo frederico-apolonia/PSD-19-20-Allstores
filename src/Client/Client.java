@@ -110,9 +110,9 @@ public class Client {
 						System.out.println("Error: check if the numbers introduced match the parameters!");
 						break;
 					} else {
-						//String resultBuy = CSIstub.buy(clientID, storeID, productID, quantity);
+						String resultBuy = CSIstub.buy(clientID, storeID, productID, quantity);
 
-						// System.out.println(); // <sold> or <unavailable> message
+						System.out.println(resultBuy); // <sold> or <unavailable> message
 					}
 				}
 
@@ -131,7 +131,7 @@ public class Client {
 						System.out.println("Error: check if you introduced the right clientID!");
 						break;
 					} else {
-						//List<String> resultBuyall = CSIstub.buyAll(clientID);
+						List<String> resultBuyall = CSIstub.buyAll(clientID);
 
 						// System.out.println(); // <cart> message, listing all the product bought by the client
 					}

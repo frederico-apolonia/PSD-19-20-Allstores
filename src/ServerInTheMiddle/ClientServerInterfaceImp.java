@@ -125,20 +125,92 @@ public class ClientServerInterfaceImp extends UnicastRemoteObject implements Cli
 	}
 
 	public List<String> getList(int storeID) throws RemoteException {
-		// get the products list of the store containing the storeID written by the
-		// client
-		HashMap<Integer, ArrayList<String>> listing = new HashMap<Integer, ArrayList<String>>();
-		ArrayList<String> productInfo = new ArrayList<String>();
-		String productID[] = { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R",
-				"S", "T" };
+		// devolve uma lista com a informação de cada produto existente na loja <storeID>
+		IDataBase connectionDB;
+		List<String> stockList = new ArrayList<String>();
 
-		for (int i = 0; i < 20; i++) {
-			Product productExmp = new Product(productID[i], 10, 0);
-			productInfo.add(productExmp.toString());
+		try {
+			connectionDB = new DatabaseImpl();
+			List<Product> listaProd = connectionDB.getShopProducts(storeID); // vai buscar a lista de produtos da loja pedida
+			for (Product p : listaProd) {
+				stockList.add(p.toString()); // para cada produto na lista vai buscar a sua informação completa (String)
+			}
+			return stockList;
+		} catch (Exception e) {
+			System.err.println("Erro na conexão entre o ServerInTheMiddle e a BD!");
+			e.printStackTrace();
 		}
-
-		listing.put(storeID, productInfo);
-		return listing.get(storeID);
+		return stockList;
 	}
 
+	public String buy(int clientID, int storeID, int productID, int quantity) throws RemoteException {
+		IDataBase connectionDB;
+		StringBuilder message = new StringBuilder();
+
+		try {
+			connectionDB = new DatabaseImpl();
+			List<Product> prodList = connectionDB.getShopProducts(storeID);
+
+			//verifica se o produto existe
+			for (Product p : prodList) {
+				if (productID == p.getProductID()) {
+
+					// verifica se o cliente já tem reservas desse produto
+					Reservation reservedProduct = connectionDB.findClientReservation(clientID, storeID, productID);
+
+					// se tiver reservas desse produto verifica se é em menor ou maior quantidade da pretendida
+					if (reservedProduct != null) {
+
+						if (quantity <= reservedProduct.getQuantity()) { // se quantidade <= reservas, atualiza as reservas e compra o produto
+
+
+							// TODO
+
+
+						} else { // se quantidade > reservas, verifica se há a diferença em loja e compra
+
+
+							// TODO
+							
+							
+						}
+
+					} else { // se não tiver nenhuma reserva desse produto, verifica se existe a quantidade em loja e efetua ou não a compra
+						if(quantity <= p.getAvailable()) {
+
+							String buyStr = connectionDB.buyProduct(storeID, productID, quantity, clientID);
+							return "Compra efetuada com sucesso! Ainda disponível: " + buyStr;
+						} else {
+							return "Erro: só existem " + p.getAvailable() + " produtos desses em stock!";
+						}
+					}
+				}
+			}
+			return "Esse produto não existe nessa loja!";
+
+		} catch (Exception e) {
+			System.err.println("Erro na conexão entre o ServerInTheMiddle e a BD!");
+			e.printStackTrace();
+		}
+		return " ";
+	}
+	
+	public List<String> buyAll(int clientID) {
+		IDataBase connectionDB;
+		
+		try {
+			connectionDB = new DatabaseImpl();
+			
+			List<Reservation> reservedList = connectionDB.getClientReservations(clientID);
+			
+			for(Reservation r : reservedList) {
+			
+			}
+			
+		} catch (Exception e) {
+			
+		}
+		
+		return null;
+	}
 }
