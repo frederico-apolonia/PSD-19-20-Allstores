@@ -133,7 +133,11 @@ public class Client {
 					} else {
 						List<String> resultBuyall = CSIstub.buyAll(clientID);
 
-						// System.out.println(); // <cart> message, listing all the product bought by the client
+						System.out.println("List of all the products bought:\n");
+						
+						for(String s : resultBuyall) {
+							System.out.println(s); // <cart> message, listing all the product bought by the client
+						}
 					}
 				}
 

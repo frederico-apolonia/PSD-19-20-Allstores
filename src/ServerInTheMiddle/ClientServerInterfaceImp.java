@@ -145,43 +145,58 @@ public class ClientServerInterfaceImp extends UnicastRemoteObject implements Cli
 
 	public String buy(int clientID, int storeID, int productID, int quantity) throws RemoteException {
 		IDataBase connectionDB;
-		StringBuilder message = new StringBuilder();
+		//StringBuilder message = new StringBuilder();
 
 		try {
 			connectionDB = new DatabaseImpl();
 			List<Product> prodList = connectionDB.getShopProducts(storeID);
 
-			//verifica se o produto existe
+			// verifica se o produto existe nessa loja
 			for (Product p : prodList) {
 				if (productID == p.getProductID()) {
 
-					// verifica se o cliente já tem reservas desse produto
+					// verifica se o cliente já tem reservas desse produto e, se tiver, verifica se é em menor ou maior quantidade da pretendida
 					Reservation reservedProduct = connectionDB.findClientReservation(clientID, storeID, productID);
 
-					// se tiver reservas desse produto verifica se é em menor ou maior quantidade da pretendida
 					if (reservedProduct != null) {
 
-						if (quantity <= reservedProduct.getQuantity()) { // se quantidade <= reservas, atualiza as reservas e compra o produto
-
-
-							// TODO
-
-
-						} else { // se quantidade > reservas, verifica se há a diferença em loja e compra
-
-
-							// TODO
+						if (reservedProduct.getQuantity() > quantity) { // se qnt reservado > qnt, compra o produto e atualiza a reserva
 							
+							String buyStr = connectionDB.buyProduct(storeID, productID, quantity, clientID);
 							
+							// remove a reserva atual e cria uma nova com a quantidade que sobra
+							int stillReserved = reservedProduct.getQuantity() - quantity;
+							connectionDB.removeReservation(reservedProduct.getClientID(),reservedProduct.getShopID(),reservedProduct.getProductID());
+							connectionDB.addReservation(storeID,productID,stillReserved,clientID);
+							
+							return "Compra efetuada com sucesso! Unidades ainda disponíveis: " + buyStr;
+
+						} else { // se qnt reservado <= qnt, verifica se há a diferença em loja
+							if(quantity - reservedProduct.getQuantity() <= p.getAvailable()) {
+								
+								connectionDB.removeReservation(reservedProduct.getClientID(),reservedProduct.getShopID(),reservedProduct.getProductID());
+								String buyStr = connectionDB.buyProduct(storeID, productID, quantity, clientID);
+								
+								//int remaining = p.getAvailable() - (quantity - reservedProduct.getQuantity());
+								//p.setAvailable(remaining);
+								
+								return "Compra efetuada com sucesso! Unidades ainda disponíveis: " + buyStr;
+								
+							} else {
+								return "Erro: Não é possível efetuar a compra! Tem " + reservedProduct.getQuantity() +
+										" unidades desse produto reservado e existem " + p.getAvailable() +
+										" unidades disponíveis em stock.";
+							}
 						}
 
 					} else { // se não tiver nenhuma reserva desse produto, verifica se existe a quantidade em loja e efetua ou não a compra
 						if(quantity <= p.getAvailable()) {
 
 							String buyStr = connectionDB.buyProduct(storeID, productID, quantity, clientID);
-							return "Compra efetuada com sucesso! Ainda disponível: " + buyStr;
+							return "Compra efetuada com sucesso! Unidades ainda disponíveis: " + buyStr;
+							
 						} else {
-							return "Erro: só existem " + p.getAvailable() + " produtos desses em stock!";
+							return "Erro: só existem " + p.getAvailable() + " unidades desse produto em stock!";
 						}
 					}
 				}
@@ -195,22 +210,41 @@ public class ClientServerInterfaceImp extends UnicastRemoteObject implements Cli
 		return " ";
 	}
 	
-	public List<String> buyAll(int clientID) {
+	public List<String> buyAll(int clientID) throws RemoteException {
 		IDataBase connectionDB;
+		List<String> soldList = new ArrayList<String>();
 		
 		try {
 			connectionDB = new DatabaseImpl();
-			
+
 			List<Reservation> reservedList = connectionDB.getClientReservations(clientID);
-			
-			for(Reservation r : reservedList) {
-			
+
+			if (reservedList != null) {
+				for(Reservation r : reservedList) { // para cada reserva do cliente, efetua a compra
+					int prod = r.getProductID();
+					int qnt = r.getQuantity();
+					
+					//connectionDB.removeReservation(clientID, r.getShopID(), r.getProductID());
+					connectionDB.buyProduct(r.getShopID(), r.getProductID(), r.getQuantity(), clientID);
+					
+					String info = "Produto " + prod + ", " + qnt + "unidades.";
+					soldList.add(info);
+				}
+				
+				return soldList;
+				
+			} else {
+				
+				soldList.add(" ");
+				return soldList;
+				
 			}
-			
+
 		} catch (Exception e) {
-			
+			System.err.println("Erro na conexão entre o ServerInTheMiddle e a BD!");
+			e.printStackTrace();
 		}
-		
+
 		return null;
 	}
 }
