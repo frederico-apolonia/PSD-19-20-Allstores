@@ -109,13 +109,6 @@ public class ClientServerInterfaceImp extends UnicastRemoteObject implements Cli
 				return message.append("Todas as reservas foram deletadas com sucesso !!!").toString();
 			else
 				return message.append("Erro ao deletar todas as reservas").toString();
-			
-			
-			
-			
-			
-			
-			
 		} catch (Exception e) {
 			System.err.println("Erro na conexão entre o ServerInTheMiddle e a BD");
 			e.printStackTrace();
