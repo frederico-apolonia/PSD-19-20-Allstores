@@ -3,7 +3,6 @@ package ServerInTheMiddle;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import ManInTheMiddleClient.ClientServerInterface;
 import DatabaseServer.DatabaseImpl;
@@ -71,31 +70,42 @@ public class ClientServerInterfaceImp extends UnicastRemoteObject implements Cli
 		return message.append("Server is Down!!!").toString();
 	}
 
-	public String cancel(int clientID) {
+	public List<String> cancel(int clientID) {
 		IDataBase conectionBD;
-		StringBuilder message = new StringBuilder();
 
 		try {
 			conectionBD = new DatabaseImpl();
 
 			// obtem todas as reservas
 			List<Reservation> listreserves = conectionBD.getClientReservations(clientID);
-
-			for (Reservation r : listreserves) {
-				// ahhhhhh ja percebi false ele diminui
-				conectionBD.productUpdateReservation(r.getShopID(), r.getProductID(), r.getQuantity(), false);
+			
+			List<String> returnReserves = new ArrayList<String>();
+			
+			if(listreserves.size()==0) 
+			{
+				
+				for (Reservation r : listreserves) {
+					
+					returnReserves.add("O id do produto"+ r.getProductID() + "a quantidade cancelada "+ r.getQuantity());
+					// ahhhhhh ja percebi false ele diminui
+					conectionBD.productUpdateReservation(r.getShopID(), r.getProductID(), r.getQuantity(), false);
+					
+				}
+				
+				boolean res = conectionBD.cancelAllReservations(clientID);
+				
+				if (res)
+					return returnReserves;
+				else
+					return (new ArrayList<>());				
 			}
-
-			boolean res = conectionBD.cancelAllReservations(clientID);
-			if (res)
-				return message.append("Todas as reservas foram deletadas com sucesso !!!").toString();
-			else
-				return message.append("Erro ao deletar todas as reservas").toString();
+			return returnReserves;
 		} catch (Exception e) {
 			System.err.println("Erro na conexão entre o ServerInTheMiddle e a BD");
 			e.printStackTrace();
 		}
-		return message.append("Server is Down!!!").toString();
+		System.err.println("Erro no Servidor !!!");
+		return (new ArrayList<>());
 
 	}
 
@@ -225,4 +235,5 @@ public class ClientServerInterfaceImp extends UnicastRemoteObject implements Cli
 
 		return null;
 	}
+
 }
