@@ -21,8 +21,6 @@ public class ClientServerInterfaceImp extends UnicastRemoteObject implements Cli
 	protected ClientServerInterfaceImp() throws RemoteException {
 		super();
 		mapReservas = new HashMap<Integer, List<Reservation>>();
-		// map.put(key, value)
-
 	}
 
 	public String getReservation(int storeID, int productID, int quantitym, int clientID) throws RemoteException {
@@ -41,10 +39,12 @@ public class ClientServerInterfaceImp extends UnicastRemoteObject implements Cli
 					Reservation reserve =conectionBD.findClientReservation(clientID,storeID,productID);		
 				if(reserve!=null) 
 				{
-					reserve.setQuantity(reserve.getQuantity() + quantitym);
-					reserve.resetTimer();//um metodo que faz reset do timer
+					int quantityToReserve= reserve.getQuantity() + quantitym;
 					
-					conectionBD.updateReservation(reserve);	
+					
+					//conectionBD.updateReservation(reserve);
+					
+					boolean verify=conectionBD.productUpdateReservation(storeID,productID,quantityToReserve, true);
 					
 				}
 				else 
@@ -53,10 +53,10 @@ public class ClientServerInterfaceImp extends UnicastRemoteObject implements Cli
 					if (p.getAvailable() >= quantitym) {
 						reserve = new Reservation(clientID, storeID, productID, quantitym);
 						
-						conectionBD.addReservation(storeID, productID, quantitym, clientID);
+						conectionBD.addReservation(reserve);
 						 
-						//mudar pois o return vai ser um boolean											NAO PERCEBI ESTE BOOLEAN
-						int remainingQty = conectionBD.productUpdateReservation(storeID, productID, quantitym, true);
+						//mudar pois o return vai ser um boolean
+						boolean verify = conectionBD.productUpdateReservation(storeID, productID, quantitym, true);
 						//falta so vericar se os metodos retornam true
 						
 						
