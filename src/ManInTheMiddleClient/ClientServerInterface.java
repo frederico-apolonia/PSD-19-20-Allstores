@@ -11,6 +11,6 @@ public interface ClientServerInterface extends Remote {
 	String buy(int clienID, int storeID, int productID, int quantity) throws RemoteException;
 
 	List<String> buyAll(int clientID) throws RemoteException;
-
-	List<String> cancel(int clientID);
+	
+	String addReservation(int storeID, int productID, int quantitym, int clientID) throws RemoteException;
 }
