@@ -86,9 +86,9 @@ public class Client {
 						System.out.println("Error: check if the numbers introduced match the parameters!");
 						break;
 					} else {
-						//String resultReserve = CSIstub.getReservation(clientID, storeID, productID, quantity);
+						String resultReserve = CSIstub.getReservation(storeID, productID, quantity, clientID);
 
-						// System.out.println(); // <reserved> or <unavailable> message
+						System.out.println(resultReserve); // <reserved> or <unavailable> message
 					}
 				}
 
@@ -156,9 +156,11 @@ public class Client {
 						System.out.println("Error: check if you introduced the right clientID!");
 						break;
 					} else {
-						//List<String> resultCancel = CSIstub.cancel(clientID);
+						List<String> resultCancel = CSIstub.cancel(clientID);
 
-						// System.out.println(); // <cancelled> message, listing the freed products
+						for(String s : resultCancel) {
+							System.out.println(s); // <cancelled> message, listing the freed products
+						}
 					}
 				}
 			}

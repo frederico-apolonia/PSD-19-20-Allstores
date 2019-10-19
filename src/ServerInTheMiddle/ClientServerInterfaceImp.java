@@ -130,7 +130,6 @@ public class ClientServerInterfaceImp extends UnicastRemoteObject implements Cli
 
 	public String buy(int clientID, int storeID, int productID, int quantity) throws RemoteException {
 		IDataBase connectionDB;
-		// StringBuilder message = new StringBuilder();
 
 		try {
 			connectionDB = new DatabaseImpl();
@@ -140,37 +139,31 @@ public class ClientServerInterfaceImp extends UnicastRemoteObject implements Cli
 			for (Product p : prodList) {
 				if (productID == p.getProductID()) {
 
-					// verifica se o cliente já tem reservas desse produto e, se tiver, verifica se
-					// é em menor ou maior quantidade da pretendida
+					// verifica se o cliente já tem reservas desse produto e
+					// se tiver, verifica se é em menor ou maior quantidade da pretendida
 					Reservation reservedProduct = connectionDB.findClientReservation(clientID, storeID, productID);
 
 					if (reservedProduct != null) {
 
-						if (reservedProduct.getQuantity() > quantity) { // se qnt reservado > qnt, compra o produto e
-																		// atualiza a reserva
+						// se qnt reservado > qnt, compra o produto e atualiza a reserva
+						if (reservedProduct.getQuantity() > quantity) {
 
-							String buyStr = connectionDB.buyProduct(storeID, productID, quantity, clientID);
-
-							// remove a reserva atual e cria uma nova com a quantidade que sobra
-							int stillReserved = reservedProduct.getQuantity() - quantity;
-							connectionDB.removeReservation(reservedProduct.getClientID(), reservedProduct.getShopID(),
-									reservedProduct.getProductID());
-							connectionDB.addReservation(storeID, productID, stillReserved, clientID);
-
-							return "Compra efetuada com sucesso! Unidades ainda disponíveis: " + buyStr;
+							Boolean check = connectionDB.buyProduct(storeID, productID, quantity, clientID);
+							
+							if(check) {
+								return "Compra efetuada com sucesso! Unidades ainda disponíveis: " + reservedProduct.getQuantity()
+									+ " reservadas e " + p.getAvailable() + " em stock.";
+							}
 
 						} else { // se qnt reservado <= qnt, verifica se há a diferença em loja
 							if (quantity - reservedProduct.getQuantity() <= p.getAvailable()) {
 
-								connectionDB.removeReservation(reservedProduct.getClientID(),
-										reservedProduct.getShopID(), reservedProduct.getProductID());
-								String buyStr = connectionDB.buyProduct(storeID, productID, quantity, clientID);
+								Boolean check = connectionDB.buyProduct(storeID, productID, quantity, clientID);
 
-								// int remaining = p.getAvailable() - (quantity -
-								// reservedProduct.getQuantity());
-								// p.setAvailable(remaining);
-
-								return "Compra efetuada com sucesso! Unidades ainda disponíveis: " + buyStr;
+								if(check) {
+									return "Compra efetuada com sucesso! Unidades ainda disponíveis: 0 reservadas e "
+											+ p.getAvailable() + " em stock.";
+								}
 
 							} else {
 								return "Erro: Não é possível efetuar a compra! Tem " + reservedProduct.getQuantity()
@@ -183,8 +176,11 @@ public class ClientServerInterfaceImp extends UnicastRemoteObject implements Cli
 								// em loja e efetua ou não a compra
 						if (quantity <= p.getAvailable()) {
 
-							String buyStr = connectionDB.buyProduct(storeID, productID, quantity, clientID);
-							return "Compra efetuada com sucesso! Unidades ainda disponíveis: " + buyStr;
+							Boolean check = connectionDB.buyProduct(storeID, productID, quantity, clientID);
+
+							if(check) {
+								return "Compra efetuada com sucesso! Unidades ainda disponíveis: " + p.getAvailable();
+							}
 
 						} else {
 							return "Erro: só existem " + p.getAvailable() + " unidades desse produto em stock!";
@@ -215,7 +211,6 @@ public class ClientServerInterfaceImp extends UnicastRemoteObject implements Cli
 					int prod = r.getProductID();
 					int qnt = r.getQuantity();
 
-					// connectionDB.removeReservation(clientID, r.getShopID(), r.getProductID());
 					connectionDB.buyProduct(r.getShopID(), r.getProductID(), r.getQuantity(), clientID);
 
 					String info = "Produto " + prod + ", " + qnt + "unidades.";
