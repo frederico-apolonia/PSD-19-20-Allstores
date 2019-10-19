@@ -14,7 +14,7 @@ public class Server {
 		
 		 System.setProperty( "java.rmi.server.hostname", "10.101.148.179" );
 		
-		Registry registry  null;
+		Registry registry =  null;
 		try {
 			registry = LocateRegistry.createRegistry(INTERFACE_PORT);
 			registry.rebind("ClientServerInterface", testing);

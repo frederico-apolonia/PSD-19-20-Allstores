@@ -13,19 +13,13 @@ import DatabaseServer.Interfaces.*;
 
 public class ClientServerInterfaceImp extends UnicastRemoteObject implements ClientServerInterface {
 
-	// idcliente,
-	HashMap<Integer, List<Reservation>> mapReservas;
-	// storeID
-	HashMap<Integer, List<Product>> mapLojas;
-
 	protected ClientServerInterfaceImp() throws RemoteException {
 		super();
-		mapReservas = new HashMap<Integer, List<Reservation>>();
-		// map.put(key, value)
+
 
 	}
 
-	public String getReservation(int storeID, int productID, int quantitym, int clientID) throws RemoteException {
+	public String addReservation(int storeID, int productID, int quantitym, int clientID) throws RemoteException {
 
 		IDataBase conectionBD;
 		StringBuilder message = new StringBuilder();
@@ -51,8 +45,6 @@ public class ClientServerInterfaceImp extends UnicastRemoteObject implements Cli
 						// a reserva nao exite sera que exite stock disponivel
 						if (p.getAvailable() >= quantitym) {
 							reserve = new Reservation(clientID, storeID, productID, quantitym);
-
-							// conectionBD.addReservation(storeID, productID, quantitym, clientID);
 
 							conectionBD.addReservation(reserve);
 
