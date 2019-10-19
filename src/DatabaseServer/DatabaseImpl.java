@@ -241,16 +241,6 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
         // update the product information (reservation space is already taken care of)
         updateBuyProduct(shopID, productID, quantity);
-        List<Product> shopProducts = this.shops.get(shopID);
-        int remainingAvailable = 0;
-        for(Product p : shopProducts) {
-            if(p.getProductID() == productID && p.getShopID() == shopID) {
-            	remainingAvailable=p.getAvailable() - quantity;
-            	p.setAvailable(remainingAvailable);
-                p.setSold(quantity);
-                break;
-            }
-        }
         // write to log
         try {
             writeBuyToLog(shopID, productID, quantity);
