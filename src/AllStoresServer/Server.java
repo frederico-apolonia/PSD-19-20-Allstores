@@ -1,6 +1,6 @@
-package ServerInTheMiddle;
+package AllStoresServer;
 import java.rmi.registry.LocateRegistry;
-import ManInTheMiddleClient.ClientServerInterface;
+import AllStoresServer.Interfaces.ClientServerInterface;
 import java.rmi.registry.Registry;
 
 

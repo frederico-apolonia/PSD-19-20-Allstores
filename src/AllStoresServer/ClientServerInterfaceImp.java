@@ -1,10 +1,10 @@
-package ServerInTheMiddle;
+package AllStoresServer;
 
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
 import java.util.List;
-import ManInTheMiddleClient.ClientServerInterface;
+import AllStoresServer.Interfaces.ClientServerInterface;
 import DatabaseServer.DatabaseImpl;
 import DatabaseServer.Product;
 import DatabaseServer.Reservation;

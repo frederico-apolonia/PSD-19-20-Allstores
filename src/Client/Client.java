@@ -3,7 +3,7 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.List;
 import java.util.Scanner;
-import ManInTheMiddleClient.ClientServerInterface;
+import AllStoresServer.Interfaces.ClientServerInterface;
 
 public class Client {
 
@@ -13,7 +13,7 @@ public class Client {
 
 		String host = "10.101.148.179"; // default host
 		ClientServerInterface CSIstub = null;
-		int clientID = 0, storeID = 0, productID = 0, quantity = 0;
+		int clientID, storeID, productID, quantity;
 
 		try {
 			while(true) {
@@ -86,7 +86,7 @@ public class Client {
 						System.out.println("Error: check if the numbers introduced match the parameters!");
 						break;
 					} else {
-						String resultReserve = CSIstub.getReservation(storeID, productID, quantity, clientID);
+						String resultReserve = CSIstub.addReservation(storeID, productID, quantity, clientID);
 
 						System.out.println(resultReserve); // <reserved> or <unavailable> message
 					}

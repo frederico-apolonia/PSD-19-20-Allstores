@@ -3,6 +3,8 @@ package DatabaseServer;
 import DatabaseServer.Interfaces.IDataBase;
 
 import java.io.*;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
@@ -22,11 +24,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
     private HashMap<Integer, List<Reservation>> reservations = new HashMap<>();
 
     public DatabaseImpl() throws Exception {
-        try {
-            initDataBase();
-        } catch (IOException e) {
-            e.getStackTrace();
-        }
+        initDataBase();
     }
 
     /**
@@ -36,6 +34,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
      */
     private void initDataBase() throws IOException {
 
+        System.out.println("Server path: " + SERVER_PATH);
         File serverDir = new File(SERVER_PATH);
         // check if there is a previous version of the server
         System.out.println("Checking if there is a previous state of the database...");
@@ -48,6 +47,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
                 generateNewShop(shopID);
             }
             System.out.println("All shops generated! Writing stores to disk...");
+            new File(SERVER_PATH).mkdir();
             writeStoresToDisk();
         }
 
@@ -71,7 +71,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
                 int productID = Integer.parseInt(shopQuantities[0]);
                 int available = Integer.parseInt(shopQuantities[1]);
-                int sold = Integer.parseInt(shopQuantities[0]);
+                int sold = Integer.parseInt(shopQuantities[2]);
 
                 shopProducts.add(new Product(shopID, productID, available, sold));
             }
@@ -143,6 +143,8 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         for(Product p : products) {
             writer.write(String.format("%d %d %d\n", p.getProductID(), p.getAvailable(), p.getSold()));
         }
+        writer.flush();
+        writer.close();
     }
 
     private void writeBuyToLog(int shopID, int productID, int quantity) throws IOException {
