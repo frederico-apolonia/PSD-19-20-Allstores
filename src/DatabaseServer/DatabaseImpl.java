@@ -43,7 +43,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
             loadShops();
         } else {
             System.out.println("No version found, starting from scratch...");
-            for (int shopID = 0; shopID < NUMBER_OF_STORES; shopID++) {
+            for (int shopID = 1; shopID <= NUMBER_OF_STORES; shopID++) {
                 generateNewShop(shopID);
             }
             System.out.println("All shops generated! Writing stores to disk...");
@@ -60,7 +60,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
     private void loadShops() throws IOException {
         // todo
         // carregar o estado das lojas para memória
-        for(int shopID = 0; shopID < NUMBER_OF_STORES; shopID++) {
+        for(int shopID = 1; shopID <= NUMBER_OF_STORES; shopID++) {
             BufferedReader fileReader = new BufferedReader(new FileReader(SERVER_PATH + shopID + ".shop"));
             List<Product> shopProducts = new ArrayList<>();
 
@@ -113,7 +113,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
     private void generateNewShop(int shopID) {
         List<Product> currShopProds = new ArrayList<>();
 
-        for(int productID = 0; productID < NUM_PRODUCT_IDS; productID++) {
+        for(int productID = 1; productID <= NUM_PRODUCT_IDS; productID++) {
             Product p = new Product(shopID, productID);
             currShopProds.add(p);
             System.out.println(String.format("Added product %s to " +
@@ -147,29 +147,34 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         writer.close();
     }
 
-    private void writeBuyToLog(int shopID, int productID, int quantity) throws IOException {
+    private boolean writeBuyToLog(int shopID, int productID, int quantity) throws IOException {
         String logPath = SERVER_PATH + "sales.log";
 
         File logFile = new File(logPath);
         FileWriter fileWriter;
-        if(logFile.exists()) {
-            double fileSize = logFile.length();
-            // if file size is larger than 1000000 bytes (1MB) then it's time to write the stores to disk
-            if(fileSize > 1000000) {
-                writeStoresToDisk();
-                fileWriter = new FileWriter(logPath, false);
-                // guarantee that it is now empty
-                fileWriter.write("");
+        try {
+            if(logFile.exists()) {
+                double fileSize = logFile.length();
+                // if file size is larger than 1000000 bytes (1MB) then it's time to write the stores to disk
+                if(fileSize > 1000000) {
+                    writeStoresToDisk();
+                    fileWriter = new FileWriter(logPath, false);
+                    // guarantee that it is now empty
+                    fileWriter.write("");
+                } else {
+                    fileWriter = new FileWriter(logPath, true);
+                }
             } else {
-                fileWriter = new FileWriter(logPath, true);
+                fileWriter = new FileWriter(logPath);
             }
-        } else {
-            fileWriter = new FileWriter(logPath);
-        }
 
-        fileWriter.append(String.format("%d %d %d", shopID, productID, quantity));
-        fileWriter.flush();
-        fileWriter.close();
+            fileWriter.append(String.format("%d %d %d", shopID, productID, quantity));
+            fileWriter.flush();
+            fileWriter.close();
+        } catch (IOException e) {
+            return false;
+        }
+        return true;
     }
 
     @Override
@@ -202,10 +207,13 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
     public synchronized Reservation findClientReservation(int clientID, int shopID, int productID) {
         Reservation result = null;
-        for(Reservation r : this.reservations.get(clientID)) {
-            if(r.getShopID() == shopID && r.getProductID() == productID) {
-                result = r;
-                break;
+        List<Reservation> clientReservations = this.reservations.get(clientID);
+        if (clientReservations != null) {
+            for(Reservation r : this.reservations.get(clientID)) {
+                if(r.getShopID() == shopID && r.getProductID() == productID) {
+                    result = r;
+                    break;
+                }
             }
         }
         return result;
@@ -245,7 +253,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         updateBuyProduct(shopID, productID, quantity);
         // write to log
         try {
-            writeBuyToLog(shopID, productID, quantity);
+            result = writeBuyToLog(shopID, productID, quantity);
         } catch (IOException e) {
             // todo
             e.printStackTrace();

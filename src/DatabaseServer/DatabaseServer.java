@@ -7,7 +7,7 @@ import java.rmi.registry.Registry;
 
 public class DatabaseServer {
 
-    static final int DATABASE_PORT = 1100;
+    private static final int DATABASE_PORT = 1100;
 
     public static void main(String[] args) throws Exception {
         IDataBase database = new DatabaseImpl();

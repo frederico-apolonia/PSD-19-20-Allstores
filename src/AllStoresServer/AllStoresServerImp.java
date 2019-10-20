@@ -1,21 +1,34 @@
 package AllStoresServer;
 
+import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
 import java.util.List;
-import AllStoresServer.Interfaces.ClientServerInterface;
+import AllStoresServer.Interfaces.AllStoresServerInterface;
 import DatabaseServer.DatabaseImpl;
 import DatabaseServer.Product;
 import DatabaseServer.Reservation;
 import DatabaseServer.Interfaces.*;
 
-public class ClientServerInterfaceImp extends UnicastRemoteObject implements ClientServerInterface {
+public class AllStoresServerImp extends UnicastRemoteObject implements AllStoresServerInterface {
 
-	protected ClientServerInterfaceImp() throws RemoteException {
-		super();
+	private String databaseHost;
+	private int databasePort;
 
+	public AllStoresServerImp(String databaseHost, int databasePort) throws Exception {
+		this.databaseHost = databaseHost;
+		this.databasePort = databasePort;
+	}
 
+	/*
+	 * Looks up and connects to the registry
+	 */
+	private IDataBase connectToDatabaseServer() throws RemoteException, NotBoundException {
+		Registry registry = LocateRegistry.getRegistry(this.databaseHost, this.databasePort);
+		return (IDataBase) registry.lookup("AllstoresDatabaseServer");
 	}
 
 	public String addReservation(int storeID, int productID, int quantitym, int clientID) throws RemoteException {
@@ -23,7 +36,7 @@ public class ClientServerInterfaceImp extends UnicastRemoteObject implements Cli
 		IDataBase conectionBD;
 		StringBuilder message = new StringBuilder();
 		try {
-			conectionBD = new DatabaseImpl();
+			conectionBD = connectToDatabaseServer();
 
 			List<Product> listaProd = conectionBD.getShopProducts(storeID);
 
@@ -70,11 +83,11 @@ public class ClientServerInterfaceImp extends UnicastRemoteObject implements Cli
 		return message.append("Server is Down!!!").toString();
 	}
 
-	public List<String> cancel(int clientID) {
+	public List<String> cancel(int clientID) throws RemoteException {
 		IDataBase conectionBD;
 
 		try {
-			conectionBD = new DatabaseImpl();
+			conectionBD = connectToDatabaseServer();
 
 			// obtem todas as reservas
 			List<Reservation> listreserves = conectionBD.getClientReservations(clientID);
@@ -116,7 +129,7 @@ public class ClientServerInterfaceImp extends UnicastRemoteObject implements Cli
 		List<String> stockList = new ArrayList<String>();
 
 		try {
-			connectionDB = new DatabaseImpl();
+			connectionDB = connectToDatabaseServer();
 			List<Product> listaProd = connectionDB.getShopProducts(storeID); // vai buscar a lista de produtos da loja
 																				// pedida
 			for (Product p : listaProd) {
@@ -134,7 +147,7 @@ public class ClientServerInterfaceImp extends UnicastRemoteObject implements Cli
 		IDataBase connectionDB;
 
 		try {
-			connectionDB = new DatabaseImpl();
+			connectionDB = connectToDatabaseServer();
 			List<Product> prodList = connectionDB.getShopProducts(storeID);
 
 			// verifica se o produto existe nessa loja
@@ -204,7 +217,7 @@ public class ClientServerInterfaceImp extends UnicastRemoteObject implements Cli
 		List<String> soldList = new ArrayList<String>();
 
 		try {
-			connectionDB = new DatabaseImpl();
+			connectionDB = connectToDatabaseServer();
 
 			List<Reservation> reservedList = connectionDB.getClientReservations(clientID);
 

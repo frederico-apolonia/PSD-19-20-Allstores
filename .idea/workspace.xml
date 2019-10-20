@@ -2,13 +2,15 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="f89fcf1b-d9b4-4795-b17c-5a303d425771" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/AllStoresServer/ClientServerInterfaceImp.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/AllStoresServer/AllStoresServerImp.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/AllStoresServer/Interfaces/ClientServerInterface.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/AllStoresServer/Interfaces/AllStoresServerInterface.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/AllStoresServer/Server.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/AllStoresServer/Server.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/Client/Client.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/Client/Client.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/DatabaseServer/DatabaseImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/DatabaseServer/DatabaseImpl.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ManInTheMiddleClient/ClientServerInterface.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/AllStoresServer/Interfaces/ClientServerInterface.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ServerInTheMiddle/ClientServerInterfaceImp.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/AllStoresServer/ClientServerInterfaceImp.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ServerInTheMiddle/Server.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/AllStoresServer/Server.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/DatabaseServer/DatabaseServer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/DatabaseServer/DatabaseServer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/DatabaseServer/Product.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/DatabaseServer/Product.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/DatabaseServer/Reservation.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/DatabaseServer/Reservation.java" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -48,7 +50,20 @@
       </list>
     </option>
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Application.Client">
+    <configuration name="Client" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <option name="MAIN_CLASS_NAME" value="Client.Client" />
+      <module name="PSD-19-20-Allstores" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="Client.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
     <configuration name="DatabaseServer" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
       <option name="MAIN_CLASS_NAME" value="DatabaseServer.DatabaseServer" />
       <module name="PSD-19-20-Allstores" />
@@ -62,8 +77,23 @@
         <option name="Make" enabled="true" />
       </method>
     </configuration>
+    <configuration name="Server" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <option name="MAIN_CLASS_NAME" value="AllStoresServer.Server" />
+      <module name="PSD-19-20-Allstores" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="AllStoresServer.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Application.Client" />
+        <item itemvalue="Application.Server" />
         <item itemvalue="Application.DatabaseServer" />
       </list>
     </recent_temporary>
@@ -81,7 +111,8 @@
       <workItem from="1570470007384" duration="1503000" />
       <workItem from="1571487753184" duration="2587000" />
       <workItem from="1571520140264" duration="356000" />
-      <workItem from="1571521539125" duration="2992000" />
+      <workItem from="1571521539125" duration="3524000" />
+      <workItem from="1571564900411" duration="3222000" />
     </task>
     <servers />
   </component>
@@ -100,5 +131,24 @@
         </entry>
       </map>
     </option>
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/AllStoresServer/AllStoresServerImp.java</url>
+          <line>153</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-method">
+          <url>file://$PROJECT_DIR$/src/DatabaseServer/DatabaseImpl.java</url>
+          <line>149</line>
+          <properties class="DatabaseServer.DatabaseImpl" method="writeBuyToLog">
+            <option name="EMULATED" value="true" />
+          </properties>
+          <option name="timeStamp" value="2" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
 </project>

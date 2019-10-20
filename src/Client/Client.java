@@ -3,16 +3,16 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.List;
 import java.util.Scanner;
-import AllStoresServer.Interfaces.ClientServerInterface;
+import AllStoresServer.Interfaces.AllStoresServerInterface;
 
 public class Client {
 
-	private static final int INTERFACE_PORT = 2000;
+	private static final int ALLSTORES_PORT = 1099;
 
 	public static void main(String[] args) throws Exception {
 
-		String host = "10.101.148.179"; // default host
-		ClientServerInterface CSIstub = null;
+		String host = "127.0.0.1"; // default host
+		AllStoresServerInterface CSIstub = null;
 		int clientID, storeID, productID, quantity;
 
 		try {
@@ -39,8 +39,8 @@ public class Client {
 
 				
 				// getting the registry and looking up the registry for the remote object
-				Registry registry = LocateRegistry.getRegistry(host,INTERFACE_PORT);
-				CSIstub = (ClientServerInterface) registry.lookup("ClientServerInterface");
+				Registry registry = LocateRegistry.getRegistry(host, ALLSTORES_PORT);
+				CSIstub = (AllStoresServerInterface) registry.lookup("ClientServerInterface");
 
 
 				// "List storeID"

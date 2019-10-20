@@ -3,7 +3,7 @@ import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.util.List;
 
-public interface ClientServerInterface extends Remote {
+public interface AllStoresServerInterface extends Remote {
 	List<String> getList(int storeID) throws RemoteException;
 	
 	String addReservation(int storeID, int productID, int quantitym, int clientID) throws RemoteException;
@@ -12,5 +12,5 @@ public interface ClientServerInterface extends Remote {
 
 	List<String> buyAll(int clientID) throws RemoteException;
 	
-	List<String> cancel(int clientID);
+	List<String> cancel(int clientID) throws RemoteException;
 }

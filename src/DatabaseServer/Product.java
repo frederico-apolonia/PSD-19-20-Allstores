@@ -1,6 +1,8 @@
 package DatabaseServer;
 
-public class Product {
+import java.io.Serializable;
+
+public class Product implements Serializable {
 
     private static final int DEFAULT_STARTING_STOCK = 10;
 

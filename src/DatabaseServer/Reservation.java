@@ -1,8 +1,9 @@
 package DatabaseServer;
 
+import java.io.Serializable;
 import java.util.Timer;
 
-public class Reservation {
+public class Reservation implements Serializable {
 
     private int clientID;
     private int shopID;
