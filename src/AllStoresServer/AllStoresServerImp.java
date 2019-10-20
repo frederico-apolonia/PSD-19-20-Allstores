@@ -31,94 +31,83 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 		return (IDataBase) registry.lookup("AllstoresDatabaseServer");
 	}
 
-	public String addReservation(int storeID, int productID, int quantitym, int clientID) throws RemoteException {
+	public String addReservation(int storeID, int productID, int quantity, int clientID) throws RemoteException {
 
-		IDataBase conectionBD;
+		IDataBase connectionDB;
 		StringBuilder message = new StringBuilder();
 		try {
-			conectionBD = connectToDatabaseServer();
+			connectionDB = connectToDatabaseServer();
 
-			List<Product> listaProd = conectionBD.getShopProducts(storeID);
+			List<Product> shopProducts = connectionDB.getShopProducts(storeID);
 
-			// verifica se esse produto existe
-			for (Product p : listaProd) {
+			// find the product
+			for (Product p : shopProducts) {
 				if (productID == p.getProductID()) {
-					// falta ver se ja existe uma reserva DESTE CLIENTE
-					Reservation reserve = conectionBD.findClientReservation(clientID, storeID, productID);
-
-					if (reserve != null) {
-						reserve.setQuantity(reserve.getQuantity() + quantitym);
-						//elimina a reserva antiga e adiciona uma nova  
-						conectionBD.removeReservation(conectionBD.findClientReservation(clientID, storeID, productID));
-						conectionBD.addReservation(reserve);
-						return message.append("Reserva foi atualizada com sucesso ").toString();
-
-					} else {
-						// a reserva nao exite sera que exite stock disponivel
-						if (p.getAvailable() >= quantitym) {
-							reserve = new Reservation(clientID, storeID, productID, quantitym);
-
-							conectionBD.addReservation(reserve);
-
-							return message.append("Nova reserva efetuada com sucesso " + p.getAvailable()
-									+ "para o produto " + productID).toString();
-
+					// verify if there is enough quantity to reserve
+					if (p.getAvailable() >= quantity) {
+						// check if the client already has a current reservation for this product
+						Reservation reservation = connectionDB.findClientReservation(clientID, storeID, productID);
+						if (reservation != null) {
+							int updateQuantity = reservation.getQuantity() + quantity;
+							if(connectionDB.updateClientReservation(reservation, updateQuantity)) {
+								message.append("Reservation updated with success.\n");
+							} else {
+								message.append("There was a problem while updating your reservation.\n");
+							}
+						// client doesn't have an existing reservation for this product
 						} else {
-							// nao exite uma reserva nem stock disponivel
-							return message.append("Isto não é a Amazon só temos de disponivel " + p.getAvailable()
-									+ "para o produto " + productID).toString();
+							reservation = new Reservation(clientID, storeID, productID, quantity);
+
+							if(connectionDB.addReservation(reservation)) {
+								message.append("New reservation added with success.\n");
+							} else {
+								message.append("There was a problem while adding your reservation.\n");
+							}
 						}
-
+						int remainingAvailable = p.getAvailable() - quantity;
+						message.append(String.format("Remaining stock: %d", remainingAvailable));
+						return message.toString();
+					// not enough stock to fulfill this reservation request
+					}  else {
+						message.append("There's no available stock to fulfill your request.");
+						message.append(String.format("Remaining stock: %d", p.getAvailable()));
+						return message.toString();
 					}
-
 				}
 			}
-
-			return message.append("Bro esse produto não existe!!").toString();
+			return message.append(String.format("Product %d doesn't exist", productID)).toString();
 
 		} catch (Exception e) {
-			System.err.println("Erro na conexão entre o ServerInTheMiddle e a BD");
+			System.err.println("Something happened while exchanging messages with the DB Server!");
 			e.printStackTrace();
 		}
-		return message.append("Server is Down!!!").toString();
+		return message.append("Server is Down.").toString();
 	}
 
 	public List<String> cancel(int clientID) throws RemoteException {
-		IDataBase conectionBD;
+		IDataBase connectionBD;
+		boolean result = false;
+		List<String> returnReserves = new ArrayList<>();
 
 		try {
-			conectionBD = connectToDatabaseServer();
+			connectionBD = connectToDatabaseServer();
 
 			// obtem todas as reservas
-			List<Reservation> listreserves = conectionBD.getClientReservations(clientID);
+			List<Reservation> clientReservations = connectionBD.getClientReservations(clientID);
 			
-			List<String> returnReserves = new ArrayList<String>();
-			
-			if(listreserves.size()==0) 
-			{
-				
-				for (Reservation r : listreserves) {
-					
-					returnReserves.add("O id do produto"+ r.getProductID() + "a quantidade cancelada "+ r.getQuantity());
-					// ahhhhhh ja percebi false ele diminui
-					conectionBD.productUpdateReservation(r.getShopID(), r.getProductID(), r.getQuantity(), false);
-					
+			if(clientReservations.size() != 0) {
+				for (Reservation r : clientReservations) {
+					returnReserves.add(String.format("Product ID %d: canceled %d products.", r.getProductID(),
+							r.getQuantity()));
 				}
-				
-				boolean res = conectionBD.cancelAllReservations(clientID);
-				
-				if (res)
-					return returnReserves;
-				else
-					return (new ArrayList<>());				
+				result = connectionBD.cancelAllReservations(clientID);
 			}
-			return returnReserves;
 		} catch (Exception e) {
-			System.err.println("Erro na conexão entre o ServerInTheMiddle e a BD");
+			System.err.println("Error while connecting to Database Server");
 			e.printStackTrace();
 		}
-		System.err.println("Erro no Servidor !!!");
-		return (new ArrayList<>());
+
+		return returnReserves;
 
 	}
 

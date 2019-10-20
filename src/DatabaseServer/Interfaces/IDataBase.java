@@ -51,6 +51,15 @@ public interface IDataBase extends Remote {
     public Reservation findClientReservation(int clientID, int shopID, int productID)throws RemoteException;
 
     /**
+     * Updates an existing client reservation
+     * @param reservation
+     * @param updateQuantity
+     * @return true if successfully updated the reservation, false if doesn't exist (or something happened)
+     * @throws RemoteException
+     */
+    public boolean updateClientReservation(Reservation reservation, int updateQuantity) throws RemoteException;
+
+    /**
      * Updates shop stock and reservation parameters
      * @param shopID
      * @param productID

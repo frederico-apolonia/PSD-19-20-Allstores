@@ -206,6 +206,15 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
     }
 
     public synchronized Reservation findClientReservation(int clientID, int shopID, int productID) {
+        Reservation r = getClientReservation(clientID, shopID, productID);
+        if (r != null) {
+            return new Reservation(r.getClientID(), r.getShopID(), r.getProductID(), r.getQuantity());
+        } else {
+            return null;
+        }
+    }
+
+    private Reservation getClientReservation(int clientID, int shopID, int productID) {
         Reservation result = null;
         List<Reservation> clientReservations = this.reservations.get(clientID);
         if (clientReservations != null) {
@@ -216,6 +225,25 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
                 }
             }
         }
+        return result;
+    }
+
+    @Override
+    public boolean updateClientReservation(Reservation reservation, int updateQuantity) throws RemoteException {
+        boolean result = false;
+        List<Reservation> clientReservations = this.reservations.get(reservation.getClientID());
+        if(clientReservations != null) {
+            for (Reservation r : clientReservations) {
+                if(reservation.equals(r)) {
+                    r.timer.cancel();
+                    r.setQuantity(updateQuantity);
+                    int reserveQuantityIncrement = updateQuantity - r.getQuantity();
+                    result = productUpdateReservation(r.getShopID(), r.getProductID(), reserveQuantityIncrement, true);
+                    superviseReservation(r);
+                }
+            }
+        }
+
         return result;
     }
 
@@ -232,7 +260,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
                     e.printStackTrace();
                 }
             }
-        }, 15);
+        }, 120*1000);
     }
 
     @Override
@@ -240,7 +268,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
         boolean result = false;
         // first, check if the client already has a reservation for this product
-        Reservation existingReservation = findClientReservation(clientID, shopID, productID);
+        Reservation existingReservation = getClientReservation(clientID, shopID, productID);
         int remainingReservationQuantity = -1;
         if(existingReservation != null) {
             // if so, disarm the clock, subtract the qty, if > 0, arm the clock again, else remove it. save the
@@ -312,7 +340,15 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
     @Override
     public List<Reservation> getClientReservations(int clientID) throws RemoteException {
-        return this.reservations.get(clientID);
+        List<Reservation> result = null;
+        if(this.reservations.containsKey(clientID)) {
+            result = new ArrayList<>();
+            for(Reservation r : this.reservations.get(clientID)) {
+                result.add(new Reservation(r.getClientID(), r.getShopID(), r.getProductID(), r.getQuantity()));
+            }
+
+        }
+        return result;
     }
 
     @Override
