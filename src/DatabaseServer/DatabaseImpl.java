@@ -260,7 +260,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
                     e.printStackTrace();
                 }
             }
-        }, 120*1000);
+        }, 15*1000);
     }
 
     @Override
