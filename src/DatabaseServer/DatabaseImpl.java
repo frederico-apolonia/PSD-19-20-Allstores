@@ -236,8 +236,8 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
             for (Reservation r : clientReservations) {
                 if(reservation.equals(r)) {
                     r.timer.cancel();
-                    r.setQuantity(updateQuantity);
                     int reserveQuantityIncrement = updateQuantity - r.getQuantity();
+                    r.setQuantity(updateQuantity);
                     result = productUpdateReservation(r.getShopID(), r.getProductID(), reserveQuantityIncrement, true);
                     superviseReservation(r);
                 }

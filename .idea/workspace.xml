@@ -5,7 +5,6 @@
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/AllStoresServer/AllStoresServerImp.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/AllStoresServer/AllStoresServerImp.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/DatabaseServer/DatabaseImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/DatabaseServer/DatabaseImpl.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/DatabaseServer/Interfaces/IDataBase.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/DatabaseServer/Interfaces/IDataBase.java" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -101,8 +100,8 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Application.DatabaseServer" />
         <item itemvalue="Application.Client" />
+        <item itemvalue="Application.DatabaseServer" />
         <item itemvalue="Application.Server" />
       </list>
     </recent_temporary>
@@ -121,7 +120,7 @@
       <workItem from="1571487753184" duration="2587000" />
       <workItem from="1571520140264" duration="356000" />
       <workItem from="1571521539125" duration="3524000" />
-      <workItem from="1571564900411" duration="9046000" />
+      <workItem from="1571564900411" duration="9500000" />
     </task>
     <servers />
   </component>
