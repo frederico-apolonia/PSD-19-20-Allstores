@@ -1,4 +1,5 @@
 package Client;
+import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.List;
@@ -12,10 +13,15 @@ public class Client {
 	public static void main(String[] args) throws Exception {
 
 		String host = "127.0.0.1"; // default host
-		AllStoresServerInterface CSIstub = null;
+		AllStoresServerInterface allStoresServer = null;
 		int clientID, storeID, productID, quantity;
 
 		try {
+
+			// getting the registry and looking up the registry for the remote object
+			Registry registry = LocateRegistry.getRegistry(host, ALLSTORES_PORT);
+			allStoresServer = (AllStoresServerInterface) registry.lookup("ClientServerInterface");
+
 			while(true) {
 				System.out.println("Welcome to Allstores, a place where you can buy products from 600 stores!\n"
 						+ "Tell us what you want to do (List, Reserve, Buy, Buyall, Cancel):");
@@ -37,130 +43,60 @@ public class Client {
 							+ "Type Cancel <clientID> to cancel all the reservations made with that client ID.\n <clientID> int.");
 				}
 
-				
-				// getting the registry and looking up the registry for the remote object
-				Registry registry = LocateRegistry.getRegistry(host, ALLSTORES_PORT);
-				CSIstub = (AllStoresServerInterface) registry.lookup("ClientServerInterface");
-
-
+				String[] splitInput = cmdline.split(" ");
 				// "List storeID"
 				if(cmdline.toUpperCase().startsWith("LIST")) {
-					String[] splitInput = cmdline.split(" ");
-					
 					if (splitInput.length != 2) {
 						System.out.println("Error: check if you introduced all (2) the parameters right!");
-						break;
 					} else {
 						storeID = Integer.parseInt(splitInput[1]);
-					}
-
-					if (storeID == 0) {
-						System.out.println("Error: check if the number introduced is between 1 and 600!");
-						break;
-					}
-
-					List<String> resultList = CSIstub.getList(storeID);
-
-					System.out.println("Available products on store number " + storeID + ":\n");
-
-					for (String s : resultList) {
-						System.out.println(s); // <stock> message, listing the products of the store required by the client
+						list(allStoresServer, storeID);
 					}
 				}
 
 				// "Reserve clientID storeID productID quantity"
 				if(cmdline.toUpperCase().startsWith("RESERVE")) {
-					String[] splitInput = cmdline.split(" ");
-
 					if (splitInput.length != 5) {
 						System.out.println("Error: check if you introduced all (5) the parameters right!");
-						break;
 					} else {
 						clientID = Integer.parseInt(splitInput[1]);
 						storeID = Integer.parseInt(splitInput[2]);
 						productID = Integer.parseInt(splitInput[3]);
 						quantity = Integer.parseInt(splitInput[4]);
-					}
-
-					if (clientID == 0 || storeID == 0 || productID == 0 || quantity == 0) {
-						System.out.println("Error: check if the numbers introduced match the parameters!");
-						break;
-					} else {
-						String resultReserve = CSIstub.addReservation(storeID, productID, quantity, clientID);
-
-						System.out.println(resultReserve); // <reserved> or <unavailable> message
+						reserve(allStoresServer, clientID, storeID, productID, quantity);
 					}
 				}
 
 				// "Buy clientID storeID productID quantity"
-				if(cmdline.toUpperCase().startsWith("BUY ")) {
-					String[] splitInput = cmdline.split(" ");
-
+				if(cmdline.toUpperCase().startsWith("BUY")) {
 					if (splitInput.length != 5) {
 						System.out.println("Error: check if you introduced all (5) the parameters right!");
-						break;
 					} else {
 						clientID = Integer.parseInt(splitInput[1]);
 						storeID = Integer.parseInt(splitInput[2]);
 						productID = Integer.parseInt(splitInput[3]);
 						quantity = Integer.parseInt(splitInput[4]);
-					}
-
-					if (clientID == 0 || storeID == 0 || productID == 0 || quantity == 0) {
-						System.out.println("Error: check if the numbers introduced match the parameters!");
-						break;
-					} else {
-						String resultBuy = CSIstub.buy(clientID, storeID, productID, quantity);
-
-						System.out.println(resultBuy); // <sold> or <unavailable> message
+						buy(allStoresServer, clientID, storeID, productID, quantity);
 					}
 				}
 
 				// "Buyall clientID"
 				if(cmdline.toUpperCase().startsWith("BUYALL")) {
-					String[] splitInput = cmdline.split(" ");
-					
 					if (splitInput.length != 2) {
 						System.out.println("Error: check if you introduced all (2) the parameters right!");
-						break;
 					} else {
 						clientID = Integer.parseInt(splitInput[1]);
-					}
-
-					if (clientID == 0) {
-						System.out.println("Error: check if you introduced the right clientID!");
-						break;
-					} else {
-						List<String> resultBuyall = CSIstub.buyAll(clientID);
-
-						System.out.println("List of all the products bought:\n");
-						
-						for(String s : resultBuyall) {
-							System.out.println(s); // <cart> message, listing all the product bought by the client
-						}
+						buyAll(allStoresServer, clientID);
 					}
 				}
 
 				// "Cancel clientID"
 				if(cmdline.toUpperCase().startsWith("CANCEL")) {
-					String[] splitInput = cmdline.split(" ");
-					
 					if (splitInput.length != 2) {
 						System.out.println("Error: check if you introduced all (2) the parameters right!");
-						break;
 					} else {
 						clientID = Integer.parseInt(splitInput[1]);
-					}
-
-					if (clientID == 0) {
-						System.out.println("Error: check if you introduced the right clientID!");
-						break;
-					} else {
-						List<String> resultCancel = CSIstub.cancel(clientID);
-
-						for(String s : resultCancel) {
-							System.out.println(s); // <cancelled> message, listing the freed products
-						}
+						cancel(allStoresServer, clientID);
 					}
 				}
 			}
@@ -172,6 +108,73 @@ public class Client {
 			e.printStackTrace();
 		}
 	}
+
+	public static void buy(AllStoresServerInterface allStoresServer, int clientID, int storeID, int productID, int quantity)
+			throws RemoteException {
+		if (clientID == 0 || storeID == 0 || productID == 0 || quantity == 0) {
+			System.out.println("Error: check if the numbers introduced match the parameters!");
+			return;
+		}
+
+		String resultBuy = allStoresServer.buy(clientID, storeID, productID, quantity);
+		System.out.println(resultBuy); // <sold> or <unavailable> message
+	}
+
+	public static void reserve(AllStoresServerInterface allStoresServer, int clientID, int storeID, int productID, int quantity)
+			throws RemoteException {
+		if (clientID == 0 || storeID == 0 || productID == 0 || quantity == 0) {
+			System.out.println("Error: check if the numbers introduced match the parameters!");
+		} else {
+			String resultReserve = allStoresServer.addReservation(storeID, productID, quantity, clientID);
+			System.out.println(resultReserve); // <reserved> or <unavailable> message
+		}
+	}
+
+	public static void buyAll(AllStoresServerInterface allStoresServer, int clientID) throws RemoteException {
+		if (clientID == 0) {
+			System.out.println("Error: check if you introduced the right clientID!");
+			return;
+		}
+
+		List<String> resultBuyAll = allStoresServer.buyAll(clientID);
+
+		System.out.println("List of all the products bought:\n");
+		for(String s : resultBuyAll) {
+			System.out.println(s); // <cart> message, listing all the product bought by the client
+		}
+	}
+
+	public static void list(AllStoresServerInterface allStoresServer, int storeID) throws RemoteException {
+
+		if (storeID == 0 || storeID > 600) {
+			System.out.println("Error: check if the number introduced is between 1 and 600!");
+			return;
+		}
+
+		List<String> resultList = allStoresServer.getList(storeID);
+
+		System.out.println(String.format("Available products on store number %d:\n", storeID));
+
+		for (String s : resultList) {
+			System.out.println(s); // <stock> message, listing the products of the store required by the client
+		}
+
+	}
+
+	public static void cancel(AllStoresServerInterface allStoresServer, int clientID) throws RemoteException {
+		if (clientID == 0) {
+			System.out.println("Error: check if you introduced the right clientID!");
+			return;
+		}
+
+		List<String> resultCancel = allStoresServer.cancel(clientID);
+
+		for(String s : resultCancel) {
+			System.out.println(s); // <cancelled> message, listing the freed products
+		}
+	}
+
+
 
 	private static boolean tryParseInt(String n) {
 		try {
