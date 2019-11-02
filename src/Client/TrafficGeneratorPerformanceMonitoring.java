@@ -6,7 +6,8 @@ import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
-import java.util.Random;
+import java.util.*;
+import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -20,6 +21,8 @@ public class TrafficGeneratorPerformanceMonitoring {
     private static final int ALLSTORES_MAX_PRODUCTID = 20;
     private static final int BUY_RESERVE_QUANTITY = 1;
 
+    private static boolean stopThreads = false;
+
     private static class Options {
         int numberClients;
         boolean writeMode = false;
@@ -27,24 +30,20 @@ public class TrafficGeneratorPerformanceMonitoring {
         int trafficTime;
     }
 
-    public static void main(String[] args) {
-        Options clientOptions = readArguments(args);
-        System.out.println(String.format("Number of clients: %d\nWrite mode = %b\nStoreID = %d\nTraffic time = %d",
-                clientOptions.numberClients, clientOptions.writeMode, clientOptions.storeID, clientOptions.trafficTime));
-
-        // ...
-        // todo inicializar X threads durante Y segundos (armar um alarme)
+    private class ThreadResult {
+        int actionCount = 0;
+        int replyCount = 0;
+        int unavailableCount = 0;
+        long timeSum;
     }
 
-    class ClientThead extends Thread {
+    class ClientThead extends Thread implements Callable<ThreadResult> {
 
         private final boolean writeMode;
         private final int singleStore;
         private final int clientID;
         private final AllStoresServerInterface allStoresServer;
-        private int actionCount = 0;
-        private int unavailableCount = 0;
-        private long timeSum;
+        private ThreadResult result = new ThreadResult();
 
         ClientThead (boolean writeMode, int singleStore, int clientID) throws RemoteException, NotBoundException {
             this.writeMode = writeMode;
@@ -55,14 +54,18 @@ public class TrafficGeneratorPerformanceMonitoring {
             this.allStoresServer = (AllStoresServerInterface) registry.lookup(ALLSTORES_REGISTRY_NAME);
         }
 
+        public ThreadResult getResult() {
+            return result;
+        }
+
         public void run() {
-            // todo falta ver como retornar valores quando o pai chama as threads de volta
             int store = singleStore;
             int product;
             long start, end;
             Random rnd = new Random();
+            String actionResult;
             try {
-                while (true) {
+                while (!stopThreads) {
                     product = rnd.nextInt(ALLSTORES_MAX_PRODUCTID) + 1;
                     if (singleStore != -1) {
                         // random store
@@ -70,22 +73,110 @@ public class TrafficGeneratorPerformanceMonitoring {
                     }
                     if (writeMode) {
                         start = System.currentTimeMillis();
-                        Client.buy(this.allStoresServer, this.clientID, store, product, BUY_RESERVE_QUANTITY);
+                        actionResult = Client.buy(this.allStoresServer, this.clientID, store, product, BUY_RESERVE_QUANTITY);
                         end = System.currentTimeMillis();
                     } else {
                         start = System.currentTimeMillis();
-                        Client.reserve(this.allStoresServer, this.clientID, store, product, BUY_RESERVE_QUANTITY);
+                        actionResult = Client.reserve(this.allStoresServer, this.clientID, store, product, BUY_RESERVE_QUANTITY);
                         end = System.currentTimeMillis();
                     }
-                    // todo if busy => nao se conta
-                    // todo if unavailable => counterUnavailable
-                    actionCount++;
-                    timeSum += (end - start);
+                    this.result.actionCount++;
+
+                    if (!actionResult.toLowerCase().contains("busy") && !actionResult.toLowerCase().contains("error")) {
+                        this.result.replyCount++;
+                        this.result.timeSum += (end - start);
+                    }
+                    if (actionResult.toLowerCase().contains("unavailable")) {
+                        this.result.unavailableCount++;
+                    }
                 }
             } catch (RemoteException e) {
                 e.printStackTrace();
             }
         }
+
+        @Override
+        public ThreadResult call() throws Exception {
+            return this.result;
+        }
+    }
+
+    public static void main(String[] args) {
+        Options options = readArguments(args);
+        System.out.println(String.format("Number of clients: %d\nWrite mode = %b\nStoreID = %d\nTraffic time = %d",
+                options.numberClients, options.writeMode, options.storeID, options.trafficTime));
+
+        TrafficGeneratorPerformanceMonitoring tgpm = new TrafficGeneratorPerformanceMonitoring();
+        try {
+            tgpm.runClients(options);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        } catch (NotBoundException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void runClients(Options options) throws RemoteException, NotBoundException {
+        // ...
+        // todo inicializar X threads durante Y segundos (armar um alarme)
+
+        List<ClientThead> threads = new ArrayList<>();
+        Random random = new Random();
+        int randomClientID;
+
+        // initialize threads
+        for (int i = 0; i < options.numberClients; i++) {
+            randomClientID = random.nextInt();
+            threads.add(i, new ClientThead(options.writeMode, options.storeID, randomClientID));
+        }
+
+        // start the threads
+        for (ClientThead ct: threads) {
+            ct.start();
+        }
+
+        // todo 1 sec clock for visual updates
+        Timer visualUpdateTimer = new Timer();
+        List<ThreadResult> updateResults = new ArrayList<>();
+        visualUpdateTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                stopThreads = true;
+
+                for(ClientThead ct: threads) {
+                    try {
+                        updateResults.add(ct.getResult());
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                // todo tratar e imprimir os resultados
+
+                // todo armar este relógio de novo (criar função à parte disto)
+            }
+        }, 1000);
+
+
+        // todo options.trafficTime clock
+        List<ThreadResult> results = new ArrayList<>();
+        Timer trafficTimeTimer = new Timer();
+        trafficTimeTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                stopThreads = true;
+
+                for(ClientThead ct: threads) {
+                    try {
+                        results.add(ct.call());
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                // todo tratar e imprimir os resultados
+            }
+        }, options.trafficTime * 1000);
 
     }
 
@@ -128,5 +219,4 @@ public class TrafficGeneratorPerformanceMonitoring {
         }
         return result;
     }
-
 }
