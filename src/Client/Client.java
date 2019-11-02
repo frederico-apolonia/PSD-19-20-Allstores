@@ -50,7 +50,7 @@ public class Client {
 						System.out.println("Error: check if you introduced all (2) the parameters right!");
 					} else {
 						storeID = Integer.parseInt(splitInput[1]);
-						list(allStoresServer, storeID);
+						System.out.println(list(allStoresServer, storeID));
 					}
 				}
 
@@ -63,7 +63,7 @@ public class Client {
 						storeID = Integer.parseInt(splitInput[2]);
 						productID = Integer.parseInt(splitInput[3]);
 						quantity = Integer.parseInt(splitInput[4]);
-						reserve(allStoresServer, clientID, storeID, productID, quantity);
+						System.out.println(reserve(allStoresServer, clientID, storeID, productID, quantity));
 					}
 				}
 
@@ -76,7 +76,7 @@ public class Client {
 						storeID = Integer.parseInt(splitInput[2]);
 						productID = Integer.parseInt(splitInput[3]);
 						quantity = Integer.parseInt(splitInput[4]);
-						buy(allStoresServer, clientID, storeID, productID, quantity);
+						System.out.println(buy(allStoresServer, clientID, storeID, productID, quantity));
 					}
 				}
 
@@ -86,7 +86,7 @@ public class Client {
 						System.out.println("Error: check if you introduced all (2) the parameters right!");
 					} else {
 						clientID = Integer.parseInt(splitInput[1]);
-						buyAll(allStoresServer, clientID);
+						System.out.println(buyAll(allStoresServer, clientID));
 					}
 				}
 
@@ -96,7 +96,7 @@ public class Client {
 						System.out.println("Error: check if you introduced all (2) the parameters right!");
 					} else {
 						clientID = Integer.parseInt(splitInput[1]);
-						cancel(allStoresServer, clientID);
+						System.out.println(cancel(allStoresServer, clientID));
 					}
 				}
 			}
@@ -109,69 +109,65 @@ public class Client {
 		}
 	}
 
-	public static void buy(AllStoresServerInterface allStoresServer, int clientID, int storeID, int productID, int quantity)
+	public static String buy(AllStoresServerInterface allStoresServer, int clientID, int storeID, int productID, int quantity)
 			throws RemoteException {
 		if (clientID == 0 || storeID == 0 || productID == 0 || quantity == 0) {
-			System.out.println("Error: check if the numbers introduced match the parameters!");
-			return;
+			return "Error: check if the numbers introduced match the parameters!";
 		}
 
-		String resultBuy = allStoresServer.buy(clientID, storeID, productID, quantity);
-		System.out.println(resultBuy); // <sold> or <unavailable> message
+		return allStoresServer.buy(clientID, storeID, productID, quantity); // <sold> or <unavailable> message
 	}
 
-	public static void reserve(AllStoresServerInterface allStoresServer, int clientID, int storeID, int productID, int quantity)
+	public static String reserve(AllStoresServerInterface allStoresServer, int clientID, int storeID, int productID, int quantity)
 			throws RemoteException {
 		if (clientID == 0 || storeID == 0 || productID == 0 || quantity == 0) {
-			System.out.println("Error: check if the numbers introduced match the parameters!");
+			return "Error: check if the numbers introduced match the parameters!";
 		} else {
-			String resultReserve = allStoresServer.addReservation(storeID, productID, quantity, clientID);
-			System.out.println(resultReserve); // <reserved> or <unavailable> message
+			return allStoresServer.addReservation(storeID, productID, quantity, clientID); // <reserved> or <unavailable> message
 		}
 	}
 
-	public static void buyAll(AllStoresServerInterface allStoresServer, int clientID) throws RemoteException {
+	public static String buyAll(AllStoresServerInterface allStoresServer, int clientID) throws RemoteException {
 		if (clientID == 0) {
-			System.out.println("Error: check if you introduced the right clientID!");
-			return;
+			return "Error: check if you introduced the right clientID!";
 		}
-
 		List<String> resultBuyAll = allStoresServer.buyAll(clientID);
 
-		System.out.println("List of all the products bought:\n");
+		StringBuilder sb = new StringBuilder();
+		sb.append("List of all the products bought:\n");
 		for(String s : resultBuyAll) {
-			System.out.println(s); // <cart> message, listing all the product bought by the client
+			sb.append(String.format("%s\n", s)); // <cart> message, listing all the product bought by the client
 		}
+		return sb.toString();
 	}
 
-	public static void list(AllStoresServerInterface allStoresServer, int storeID) throws RemoteException {
+	public static String list(AllStoresServerInterface allStoresServer, int storeID) throws RemoteException {
 
 		if (storeID == 0 || storeID > 600) {
-			System.out.println("Error: check if the number introduced is between 1 and 600!");
-			return;
+			return "Error: check if the number introduced is between 1 and 600!";
 		}
 
 		List<String> resultList = allStoresServer.getList(storeID);
-
-		System.out.println(String.format("Available products on store number %d:\n", storeID));
+		StringBuilder sb = new StringBuilder();
+		sb.append(String.format("Available products on store number %d:\n", storeID));
 
 		for (String s : resultList) {
-			System.out.println(s); // <stock> message, listing the products of the store required by the client
+			sb.append(String.format("%s\n", s)); // <stock> message, listing the products of the store required by the client
 		}
-
+		return sb.toString();
 	}
 
-	public static void cancel(AllStoresServerInterface allStoresServer, int clientID) throws RemoteException {
+	public static String cancel(AllStoresServerInterface allStoresServer, int clientID) throws RemoteException {
 		if (clientID == 0) {
-			System.out.println("Error: check if you introduced the right clientID!");
-			return;
+			return "Error: check if you introduced the right clientID!";
 		}
 
 		List<String> resultCancel = allStoresServer.cancel(clientID);
-
+		StringBuilder sb = new StringBuilder();
 		for(String s : resultCancel) {
-			System.out.println(s); // <cancelled> message, listing the freed products
+			sb.append(String.format("%s\n", s)); // <cancelled> message, listing the freed products
 		}
+		return sb.toString();
 	}
 
 
