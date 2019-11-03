@@ -184,7 +184,6 @@ public class TrafficGeneratorPerformanceMonitoring {
 	}
 
 	private void printProgress(List<ThreadResult> updateResults) {
-		// todo tratar e imprimir os resultados
 		double totalNumberRequests = 0, completedRequests = 0, unavailableRequests = 0;
 		long totalLatency = 0;
 		for (ThreadResult tr : updateResults) {
@@ -204,30 +203,7 @@ public class TrafficGeneratorPerformanceMonitoring {
 	}
 
 	private void printFinalResults(List<ThreadResult> results) {
-		
-
-		double totalNumberRequests = 0, completedRequests = 0, unavailableRequests = 0;
-		long totalLatency = 0;
-		for (ThreadResult tr : results) {
-			try {
-				tr.join();
-				System.out.println("o numero de threds ativas é: "+ ThreadResult.activeCount());
-				totalNumberRequests += tr.actionCount;
-				completedRequests += tr.replyCount;
-				unavailableRequests += tr.unavailableCount;
-				totalLatency += tr.timeSum;
-			} catch (InterruptedException e) {
-
-				e.printStackTrace();
-			}
-		}
-
-		double fulfilledRate = ((totalNumberRequests - unavailableRequests) / completedRequests);
-		System.out.println("Number of requests sent: " + totalNumberRequests + "\nNumber of received replies: "
-				+ (completedRequests + unavailableRequests));
-		System.out.println(String.format(
-				"last one Elapsed time: %d seconds\nThroughput: %.2f op/s\nAverage latency: %.2f ms\nFulfilled rate: %.2f%%",
-				elapsedTime, (completedRequests / elapsedTime), (totalLatency / totalNumberRequests), fulfilledRate));
+		// todo imprimir os resultados finais de acordo com o enunciado
 	}
 
 	/**
