@@ -167,8 +167,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
             } else {
                 fileWriter = new FileWriter(logPath);
             }
-
-            fileWriter.append(String.format("%d %d %d", shopID, productID, quantity));
+            fileWriter.append(String.format("%d %d %d\n", shopID, productID, quantity));
             fileWriter.flush();
             fileWriter.close();
         } catch (IOException e) {
@@ -236,6 +235,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
             for (Reservation r : clientReservations) {
                 if(reservation.equals(r)) {
                     r.timer.cancel();
+                    r.timer.purge();
                     int reserveQuantityIncrement = updateQuantity - r.getQuantity();
                     r.setQuantity(updateQuantity);
                     result = productUpdateReservation(r.getShopID(), r.getProductID(), reserveQuantityIncrement, true);
