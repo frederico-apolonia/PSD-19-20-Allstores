@@ -22,6 +22,7 @@ public class TrafficGeneratorPerformanceMonitoring {
     private static final int BUY_RESERVE_QUANTITY = 1;
 
     private static boolean stopThreads = false;
+    private static int elapsedTime;
 
     private static class Options {
         int numberClients;
@@ -64,10 +65,11 @@ public class TrafficGeneratorPerformanceMonitoring {
             long start, end;
             Random rnd = new Random();
             String actionResult;
+            boolean randomStores = singleStore == -1;
             try {
                 while (!stopThreads) {
                     product = rnd.nextInt(ALLSTORES_MAX_PRODUCTID) + 1;
-                    if (singleStore != -1) {
+                    if (randomStores) {
                         // random store
                         store = rnd.nextInt(ALLSTORES_MAX_SHOPID) + 1;
                     }
@@ -135,13 +137,13 @@ public class TrafficGeneratorPerformanceMonitoring {
             ct.start();
         }
 
-        // todo 1 sec clock for visual updates
+        // 1 sec clock for visual updates
         Timer visualUpdateTimer = new Timer();
-        List<ThreadResult> updateResults = new ArrayList<>();
         visualUpdateTimer.schedule(new TimerTask() {
             @Override
             public void run() {
-                stopThreads = true;
+                elapsedTime++;
+                List<ThreadResult> updateResults = new ArrayList<>();
 
                 for(ClientThead ct: threads) {
                     try {
@@ -151,19 +153,17 @@ public class TrafficGeneratorPerformanceMonitoring {
                     }
                 }
 
-                // todo tratar e imprimir os resultados
+                printProgress(updateResults);
 
-                // todo armar este relógio de novo (criar função à parte disto)
             }
-        }, 1000);
+        }, 1000, 1000);
 
-
-        // todo options.trafficTime clock
         List<ThreadResult> results = new ArrayList<>();
         Timer trafficTimeTimer = new Timer();
         trafficTimeTimer.schedule(new TimerTask() {
             @Override
             public void run() {
+                visualUpdateTimer.cancel();
                 stopThreads = true;
 
                 for(ClientThead ct: threads) {
@@ -174,10 +174,32 @@ public class TrafficGeneratorPerformanceMonitoring {
                     }
                 }
 
-                // todo tratar e imprimir os resultados
+                printFinalResults(results);
             }
-        }, options.trafficTime * 1000);
+        }, (options.trafficTime * 1000));
 
+    }
+
+    private void printProgress(List<ThreadResult> updateResults) {
+        // todo tratar e imprimir os resultados
+        double totalNumberRequests = 0, completedRequests = 0, unavailableRequests = 0;
+        long totalLatency = 0;
+        for (ThreadResult tr: updateResults) {
+            totalNumberRequests += tr.actionCount;
+            completedRequests += tr.replyCount;
+            unavailableRequests += tr.unavailableCount;
+            totalLatency += tr.timeSum;
+        }
+
+        double fulfilledRate = ((totalNumberRequests - unavailableRequests)/completedRequests);
+        System.out.println(String.format("Elapsed time: %d seconds\nThroughput: %.2f op/s\nAverage latency: %.2f ms\nFulfilled rate: %.2f%%",
+                elapsedTime, (completedRequests/elapsedTime), (totalLatency/totalNumberRequests), fulfilledRate));
+
+    }
+
+    private void printFinalResults(List<ThreadResult> results) {
+        // todo tratar e imprimir os resultados
+        System.out.println("Acabou.");
     }
 
     /**
