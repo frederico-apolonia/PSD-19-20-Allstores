@@ -38,7 +38,7 @@ public class TrafficGeneratorPerformanceMonitoring {
 		long timeSum;
 	}
 
-	class ClientThead extends Thread implements Callable<ThreadResult> {
+	class ClientThread extends Thread implements Callable<ThreadResult> {
 
 		private final boolean writeMode;
 		private final int singleStore;
@@ -46,7 +46,7 @@ public class TrafficGeneratorPerformanceMonitoring {
 		private final AllStoresServerInterface allStoresServer;
 		private ThreadResult result = new ThreadResult();
 
-		ClientThead(boolean writeMode, int singleStore, int clientID) throws RemoteException, NotBoundException {
+		ClientThread(boolean writeMode, int singleStore, int clientID) throws RemoteException, NotBoundException {
 			this.writeMode = writeMode;
 			this.singleStore = singleStore;
 			this.clientID = clientID;
@@ -125,18 +125,18 @@ public class TrafficGeneratorPerformanceMonitoring {
 		// ...
 		// todo inicializar X threads durante Y segundos (armar um alarme)
 
-		List<ClientThead> threads = new ArrayList<>();
+		List<ClientThread> threads = new ArrayList<>();
 		Random random = new Random();
 		int randomClientID;
 
 		// initialize threads
 		for (int i = 0; i < options.numberClients; i++) {
 			randomClientID = random.nextInt();
-			threads.add(i, new ClientThead(options.writeMode, options.storeID, randomClientID));
+			threads.add(i, new ClientThread(options.writeMode, options.storeID, randomClientID));
 		}
 
 		// start the threads
-		for (ClientThead ct : threads) {
+		for (ClientThread ct : threads) {
 			ct.start();
 		}
 
@@ -148,7 +148,7 @@ public class TrafficGeneratorPerformanceMonitoring {
 				elapsedTime++;
 				List<ThreadResult> updateResults = new ArrayList<>();
 
-				for (ClientThead ct : threads) {
+				for (ClientThread ct : threads) {
 					try {
 						updateResults.add(ct.getResult());
 					} catch (Exception e) {
@@ -169,7 +169,7 @@ public class TrafficGeneratorPerformanceMonitoring {
 				visualUpdateTimer.cancel();
 				stopThreads = true;
 
-				for (ClientThead ct : threads) {
+				for (ClientThread ct : threads) {
 					try {
 						results.add(ct.call());
 					} catch (Exception e) {
@@ -203,7 +203,27 @@ public class TrafficGeneratorPerformanceMonitoring {
 	}
 
 	private void printFinalResults(List<ThreadResult> results) {
-		// todo imprimir os resultados finais de acordo com o enunciado
+		double totalNumberRequests = 0, completedRequests = 0, unavailableRequests = 0;
+		
+		for (ThreadResult tr : results) {
+			try {
+				tr.join();
+				totalNumberRequests += tr.actionCount;
+				completedRequests += tr.replyCount;
+				unavailableRequests += tr.unavailableCount;
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+
+		double fulfilledRate = ((totalNumberRequests - unavailableRequests) / totalNumberRequests);
+		double completionRate = ((totalNumberRequests - completedRequests) / totalNumberRequests);
+
+		System.out.println(String.format(
+				"Total number of sent requests: %f\nThe number of received replies: %f\nExecution time: %d seconds\nThroughput: %.2f op/s\nFulfilled rate: %.2f%\nCompletion rate: %.2f%",
+				totalNumberRequests, completedRequests, elapsedTime, (completedRequests / elapsedTime), fulfilledRate, completionRate));
+		System.out.println("");
+		System.out.println("");
 	}
 
 	/**
