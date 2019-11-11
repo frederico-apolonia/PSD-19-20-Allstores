@@ -5,6 +5,7 @@ import DatabaseServer.Interfaces.IDataBase;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 
+
 public class DatabaseServer {
 
     private static final int DATABASE_PORT = 1100;

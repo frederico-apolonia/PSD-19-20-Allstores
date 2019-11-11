@@ -1,10 +1,11 @@
 package Client;
+import AllStoresServer.Interfaces.AllStoresServerInterface;
+
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.List;
 import java.util.Scanner;
-import AllStoresServer.Interfaces.AllStoresServerInterface;
 
 public class Client {
 

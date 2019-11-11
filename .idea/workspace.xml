@@ -2,15 +2,46 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="f89fcf1b-d9b4-4795-b17c-5a303d425771" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/target/classes/AllStoresServer/AllStoresServerImp.class" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/target/classes/AllStoresServer/Interfaces/AllStoresServerInterface.class" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/target/classes/AllStoresServer/Server.class" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/target/classes/Client/Client.class" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/target/classes/Client/TrafficGeneratorPerformanceMonitoring$1.class" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/target/classes/Client/TrafficGeneratorPerformanceMonitoring$2.class" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/target/classes/Client/TrafficGeneratorPerformanceMonitoring$ClientThread.class" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/target/classes/Client/TrafficGeneratorPerformanceMonitoring$Options.class" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/target/classes/Client/TrafficGeneratorPerformanceMonitoring$ThreadResult.class" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/target/classes/Client/TrafficGeneratorPerformanceMonitoring.class" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/target/classes/DatabaseServer/DatabaseImpl$1.class" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/target/classes/DatabaseServer/DatabaseImpl.class" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/target/classes/DatabaseServer/DatabaseServer.class" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/target/classes/DatabaseServer/Interfaces/IDataBase.class" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/target/classes/DatabaseServer/Product.class" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/target/classes/DatabaseServer/Reservation.class" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/target/classes/META-INF/PSD-19-20-Allstores.kotlin_module" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/AllStoresServer/AllStoresServerImp.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/AllStoresServer/AllStoresServerImp.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/DatabaseServer/DatabaseImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/DatabaseServer/DatabaseImpl.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/PSD-19-20-Allstores.iml" beforeDir="false" afterPath="$PROJECT_DIR$/PSD-19-20-Allstores.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/AllStoresServer/AllStoresServerImp.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/AllStoresServer/AllStoresServerImp.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/AllStoresServer/Interfaces/AllStoresServerInterface.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/AllStoresServer/Interfaces/AllStoresServerInterface.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/AllStoresServer/Server.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/AllStoresServer/Server.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Client/Client.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/Client/Client.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Client/TrafficGeneratorPerformanceMonitoring.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/Client/TrafficGeneratorPerformanceMonitoring.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/DatabaseServer/DatabaseImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/DatabaseServer/DatabaseImpl.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/DatabaseServer/DatabaseServer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/DatabaseServer/DatabaseServer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/DatabaseServer/Interfaces/IDataBase.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/DatabaseServer/Interfaces/IDataBase.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/DatabaseServer/Product.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/DatabaseServer/Product.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/DatabaseServer/Reservation.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/DatabaseServer/Reservation.java" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="CodeInsightWorkspaceSettings">
+    <option name="optimizeImportsOnTheFly" value="true" />
   </component>
   <component name="DatabaseView">
     <option name="SHOW_INTERMEDIATE" value="true" />
@@ -25,6 +56,9 @@
     </option>
     <expand />
     <select />
+  </component>
+  <component name="FavoritesManager">
+    <favorites_list name="PSD-19-20-Allstores" />
   </component>
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
@@ -45,6 +79,7 @@
     <property name="project.structure.last.edited" value="Modules" />
     <property name="project.structure.proportion" value="0.0" />
     <property name="project.structure.side.proportion" value="0.0" />
+    <property name="settings.editor.selected.configurable" value="reference.projectsettings.compiler.javacompiler" />
   </component>
   <component name="RunDashboard">
     <option name="ruleStates">
@@ -58,7 +93,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Application.DatabaseServer">
+  <component name="RunManager" selected="Application.TrafficGeneratorPerformanceMonitoring">
     <configuration name="Client" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
       <option name="MAIN_CLASS_NAME" value="Client.Client" />
       <module name="PSD-19-20-Allstores" />
@@ -75,6 +110,7 @@
     <configuration name="DatabaseServer" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
       <option name="MAIN_CLASS_NAME" value="DatabaseServer.DatabaseServer" />
       <module name="PSD-19-20-Allstores" />
+      <option name="VM_PARAMETERS" value="-Xmx4098M -Xms4098M" />
       <extension name="coverage">
         <pattern>
           <option name="PATTERN" value="DatabaseServer.*" />
@@ -98,11 +134,32 @@
         <option name="Make" enabled="true" />
       </method>
     </configuration>
+    <configuration name="TrafficGeneratorPerformanceMonitoring" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <option name="MAIN_CLASS_NAME" value="Client.TrafficGeneratorPerformanceMonitoring" />
+      <module name="PSD-19-20-Allstores" />
+      <option name="PROGRAM_PARAMETERS" value="5 3" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="Client.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <list>
+      <item itemvalue="Application.Client" />
+      <item itemvalue="Application.DatabaseServer" />
+      <item itemvalue="Application.Server" />
+      <item itemvalue="Application.TrafficGeneratorPerformanceMonitoring" />
+    </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Application.TrafficGeneratorPerformanceMonitoring" />
         <item itemvalue="Application.Client" />
-        <item itemvalue="Application.DatabaseServer" />
         <item itemvalue="Application.Server" />
+        <item itemvalue="Application.DatabaseServer" />
       </list>
     </recent_temporary>
   </component>
@@ -121,6 +178,15 @@
       <workItem from="1571520140264" duration="356000" />
       <workItem from="1571521539125" duration="3524000" />
       <workItem from="1571564900411" duration="9500000" />
+      <workItem from="1572435916472" duration="2096000" />
+      <workItem from="1572644935143" duration="5985000" />
+      <workItem from="1572694871014" duration="5606000" />
+      <workItem from="1572704862785" duration="827000" />
+      <workItem from="1572778368562" duration="9649000" />
+      <workItem from="1572799171412" duration="919000" />
+      <workItem from="1572819301554" duration="496000" />
+      <workItem from="1573165488296" duration="596000" />
+      <workItem from="1573482615215" duration="1420000" />
     </task>
     <servers />
   </component>
