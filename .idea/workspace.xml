@@ -2,13 +2,9 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="f89fcf1b-d9b4-4795-b17c-5a303d425771" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/src/main/java/ZooKeeper/ZooKeeperClientExample.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/ZooKeeper/ZooKeeperConnector.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/ZooKeeper/ZooKeeperManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/DatabaseServer/DatabaseServer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/DatabaseServer/DatabaseServer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/classes/DatabaseServer/DatabaseServer.class" beforeDir="false" afterPath="$PROJECT_DIR$/target/classes/DatabaseServer/DatabaseServer.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/ZooKeeper/ZooKeeperClientExample.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/ZooKeeper/ZooKeeperClientExample.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/ZooKeeper/ZooKeeperManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/ZooKeeper/ZooKeeperManager.java" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -187,7 +183,8 @@
       <workItem from="1572819301554" duration="496000" />
       <workItem from="1573165488296" duration="596000" />
       <workItem from="1573482615215" duration="2607000" />
-      <workItem from="1573493424050" duration="4558000" />
+      <workItem from="1573493424050" duration="4680000" />
+      <workItem from="1573503386791" duration="6827000" />
     </task>
     <servers />
   </component>
