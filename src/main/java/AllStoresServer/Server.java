@@ -1,27 +1,51 @@
 package AllStoresServer;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.rmi.registry.LocateRegistry;
 import AllStoresServer.Interfaces.AllStoresServerInterface;
+import ZooKeeper.*;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.ZooDefs;
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.data.Stat;
+
 import java.rmi.registry.Registry;
 
 
 public class Server {
-	
-	private static final int ALLSTORES_PORT = 1099;
+
+	private static ZooKeeperConnector zooKeeperConnector;
+	private static final String FILE_SEPARATOR = File.separator;
+	// property fetches the home path
+	private static final String ZK_PATH = System.getProperty("user.home")
+			+ FILE_SEPARATOR + "AllstoresDB" + FILE_SEPARATOR;
 
 	public static void main(String[] args) throws Exception {
-		String databaseHost = "127.0.0.1";
-		int databasePort = 1100;
 
-		if (args.length == 2) {
-			databaseHost = args[0];
-			databasePort = Integer.parseInt(args[1]);
+		String zooKeeperHost = getZooKeeperHost();
+		ZooKeeper zooKeeper = zooKeeperConnector.connect(zooKeeperHost);
+
+		Stat appStat = zooKeeper.exists("/app", false);
+		if (appStat == null) {
+			zooKeeper.create("/app", "15000".getBytes(), ZooDefs.Ids.READ_ACL_UNSAFE, CreateMode.PERSISTENT);
+			appStat = zooKeeper.exists("/app", false);
 		}
 
-		AllStoresServerInterface testing = new AllStoresServerImp(databaseHost, databasePort);
+		String znodePath = zooKeeper.create("/app/", "".getBytes(), ZooDefs.Ids.READ_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+		String[] znodePathSplit = znodePath.split("/");
+		int sequentialNumber = Integer.parseInt(znodePathSplit[znodePathSplit.length - 1].replace("0",""));
+		int port = Integer.parseInt(new String(zooKeeper.getData("/app", false, appStat))) + sequentialNumber;
+
+		// port must be lower than 15500 so it doesn't collide with DB
+		assert port < 15500;
+
+		AllStoresServerInterface testing = new AllStoresServerImp(zooKeeperHost, port);
 		
 		Registry registry =  null;
 		try {
-			registry = LocateRegistry.createRegistry(ALLSTORES_PORT);
+			registry = LocateRegistry.createRegistry(port);
 			registry.rebind("ClientServerInterface", testing);
 			System.out.println("Server ready!");
 		}
@@ -42,6 +66,13 @@ public class Server {
 
 		String myID = address + ":" + "ClientServerInterface";
 		System.out.println(myID);
+	}
+
+	private static String getZooKeeperHost() throws IOException {
+		BufferedReader fileReader = new BufferedReader(new FileReader(ZK_PATH + "conf.cfg"));
+		String result = fileReader.readLine();
+		fileReader.close();
+		return result;
 	}
 
 }
