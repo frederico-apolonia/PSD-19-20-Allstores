@@ -25,17 +25,16 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 
 	private String databaseHost;
 	private int databasePort;
+	private ZooKeeper zooKeeper;
 	
 	private static final int NUMBER_OF_STORES = 600;
-    
-	private static ZooKeeperConnector zooKeeperConnector;
 	private static final String FILE_SEPARATOR = File.separator;
 	// property fetches the home path
 	private static final String ZK_PATH = System.getProperty("user.home")
 			+ FILE_SEPARATOR + "AllstoresDB" + FILE_SEPARATOR;
 	
-	public AllStoresServerImp(String databaseHost, int databasePort) throws Exception {
-		this.databaseHost = databaseHost;
+	public AllStoresServerImp(ZooKeeper zooKeeper, int databasePort) throws Exception {
+		this.zooKeeper = zooKeeper;
 		this.databasePort = databasePort;
 	}
 
@@ -53,9 +52,6 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 	private IDataBase connectToDatabaseServer(int storeID) throws RemoteException, NotBoundException {
 		
 		try {
-			String zooKeeperHost = getZooKeeperHost();
-			ZooKeeper zooKeeper = zooKeeperConnector.connect(zooKeeperHost);
-			
 			Stat stat = zooKeeper.exists(ZK_PATH.concat("db"), false);
 			if(stat != null) {
 				// fetch all children from /db
@@ -71,10 +67,19 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 						
 						//get the data associated with znode, that will give "host:port" of db server
 						byte[] bp = zooKeeper.getData(ZK_PATH.concat("db").concat(FILE_SEPARATOR).concat(znode), false, null);
-						String port = new String(bp);
+						String s = new String(bp);
 						
-						Registry registry = LocateRegistry.getRegistry(zooKeeperHost, Integer.parseInt(port)); // zooKeeperHost?? ou cada réplica faz setData do seu ip e porto?
-						return (IDataBase) registry.lookup("AllstoresDatabaseServer");
+						//com setData(path, "host:port".getBytes(), version) no znode do servidor db quando se conecta??
+						String[] data = s.split(":");
+						
+						if(data.length == 2) {
+							databaseHost = data[0];
+							databasePort = Integer.parseInt(data[1]);
+							
+							Registry registry = LocateRegistry.getRegistry(databaseHost, databasePort);
+							return (IDataBase) registry.lookup("AllstoresDatabaseServer");
+						}
+						
 					} else {
 						inf = sup;
 					}
@@ -298,12 +303,5 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 		}
 
 		return null;
-	}
-
-	private static String getZooKeeperHost() throws IOException {
-		BufferedReader fileReader = new BufferedReader(new FileReader(ZK_PATH + "conf.cfg"));
-		String result = fileReader.readLine();
-		fileReader.close();
-		return result;
 	}
 }
