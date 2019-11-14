@@ -2,9 +2,14 @@ package AllStoresServer;
 
 import AllStoresServer.Interfaces.AllStoresServerInterface;
 import DatabaseServer.Interfaces.IDataBase;
+import ZooKeeper.ZooKeeperConnector;
 import DatabaseServer.Product;
 import DatabaseServer.Reservation;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
@@ -13,11 +18,22 @@ import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.data.Stat;
+
 public class AllStoresServerImp extends UnicastRemoteObject implements AllStoresServerInterface {
 
 	private String databaseHost;
 	private int databasePort;
-
+	
+	private static final int NUMBER_OF_STORES = 600;
+    
+	private static ZooKeeperConnector zooKeeperConnector;
+	private static final String FILE_SEPARATOR = File.separator;
+	// property fetches the home path
+	private static final String ZK_PATH = System.getProperty("user.home")
+			+ FILE_SEPARATOR + "AllstoresDB" + FILE_SEPARATOR;
+	
 	public AllStoresServerImp(String databaseHost, int databasePort) throws Exception {
 		this.databaseHost = databaseHost;
 		this.databasePort = databasePort;
@@ -30,13 +46,53 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 		Registry registry = LocateRegistry.getRegistry(this.databaseHost, this.databasePort);
 		return (IDataBase) registry.lookup("AllstoresDatabaseServer");
 	}
+	
+	/*
+	 * Looks up and connects to the registry based on store ID
+	 */
+	private IDataBase connectToDatabaseServer(int storeID) throws RemoteException, NotBoundException {
+		
+		try {
+			String zooKeeperHost = getZooKeeperHost();
+			ZooKeeper zooKeeper = zooKeeperConnector.connect(zooKeeperHost);
+			
+			Stat stat = zooKeeper.exists(ZK_PATH.concat("db"), false);
+			if(stat != null) {
+				// fetch all children from /db
+				List<String> children = zooKeeper.getChildren(ZK_PATH.concat("db"), false);
+				
+				int inf = 0;
+				for (int i = 1; i <= children.size(); i++) {
+					int sup = (NUMBER_OF_STORES * i) / children.size();
+					
+					if(storeID > inf && storeID <= sup) {
+						//get the znode related to the storeID
+						String znode = children.get(i-1);
+						
+						//get the data associated with znode, that will give "host:port" of db server
+						byte[] bp = zooKeeper.getData(ZK_PATH.concat("db").concat(FILE_SEPARATOR).concat(znode), false, null);
+						String port = new String(bp);
+						
+						Registry registry = LocateRegistry.getRegistry(zooKeeperHost, Integer.parseInt(port)); // zooKeeperHost?? ou cada réplica faz setData do seu ip e porto?
+						return (IDataBase) registry.lookup("AllstoresDatabaseServer");
+					} else {
+						inf = sup;
+					}
+				} 
+				
+			} else { System.out.println("Node does not exist."); }
+			
+		} catch (Exception e) { System.out.println(e.getMessage()); }
+		
+		return null;
+	}
 
 	public String addReservation(int storeID, int productID, int quantity, int clientID) throws RemoteException {
 
 		IDataBase connectionDB;
 		StringBuilder message = new StringBuilder();
 		try {
-			connectionDB = connectToDatabaseServer();
+			connectionDB = connectToDatabaseServer(storeID);
 
 			// find the product
 			Product product = getProductFromList(connectionDB.getShopProducts(storeID), productID);
@@ -115,7 +171,7 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 		List<String> stockList = new ArrayList<String>();
 
 		try {
-			connectionDB = connectToDatabaseServer();
+			connectionDB = connectToDatabaseServer(storeID);
 			List<Product> listaProd = connectionDB.getShopProducts(storeID); // vai buscar a lista de produtos da loja
 																				// pedida
 			for (Product p : listaProd) {
@@ -134,7 +190,7 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 		StringBuilder sb = new StringBuilder();
 
 		try {
-			connectionDB = connectToDatabaseServer();
+			connectionDB = connectToDatabaseServer(storeID);
 			Product product = getProductFromList(connectionDB.getShopProducts(storeID), productID);
 
 			if(product != null) {
@@ -244,4 +300,10 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 		return null;
 	}
 
+	private static String getZooKeeperHost() throws IOException {
+		BufferedReader fileReader = new BufferedReader(new FileReader(ZK_PATH + "conf.cfg"));
+		String result = fileReader.readLine();
+		fileReader.close();
+		return result;
+	}
 }
