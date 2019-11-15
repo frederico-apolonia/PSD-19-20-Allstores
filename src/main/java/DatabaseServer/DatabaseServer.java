@@ -24,29 +24,30 @@ public class DatabaseServer {
     private static final String ZK_PATH = System.getProperty("user.home")
             + FILE_SEPARATOR + "AllstoresDB" + FILE_SEPARATOR;
 
-    private static ZooKeeperConnector zooKeeperConnector;
-
+    private static ZooKeeperConnector zooKeeperConnector = new ZooKeeperConnector();
 
     public static void main(String[] args) throws Exception {
         // connect and register in zookeeper
         String zooKeeperHost = getZooKeeperHost();
         ZooKeeper zooKeeper = zooKeeperConnector.connect(zooKeeperHost);
 
-        Stat appStat = zooKeeper.exists("/db", false);
+        Stat appStat = zooKeeper.exists("/db/clients", false);
         if (appStat == null) {
-            zooKeeper.create("/db", "15500".getBytes(), ZooDefs.Ids.READ_ACL_UNSAFE, CreateMode.PERSISTENT);
-            appStat = zooKeeper.exists("/db", false);
+            zooKeeper.create("/db", "15500".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            zooKeeper.create("/db/clients", "".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            appStat = zooKeeper.exists("/db/clients", false);
         }
 
-        String znodePath = zooKeeper.create("/db/", "".getBytes(), ZooDefs.Ids.READ_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+        String znodePath = zooKeeper.create("/db/clients/", "".getBytes(), ZooDefs.Ids.READ_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
         String[] znodePathSplit = znodePath.split("/");
         int sequentialNumber = Integer.parseInt(znodePathSplit[znodePathSplit.length - 1].replace("0",""));
-        int port = Integer.parseInt(new String(zooKeeper.getData("/db", false, appStat))) + sequentialNumber;
+        int zookeeperId = Integer.parseInt(new String(zooKeeper.getData("/db", false, appStat)))
+        int port = zookeeperId + sequentialNumber;
 
         // port must be higher than 15500 so it doesn't collide with AllStoresApp
         assert port > 15500;
 
-        IDataBase database = new DatabaseImpl();
+        IDataBase database = new DatabaseImpl(zooKeeper, zookeeperId);
 
         /* Create registry and rebind it to port DATABASE_PORT */
         Registry registry = null;
@@ -59,18 +60,7 @@ public class DatabaseServer {
             System.exit(0);
         }
 
-        /* Get server address */
-        String address = null;
-        try {
-            address = System.getProperty("java.rmi.server.hostname");
-            // is address null? if so then it is 127.0.0.1 (localhost), else it still is address
-            address = address == null ? "127.0.0.1" : address;
-        } catch (Exception e) {
-            System.out.println("Can't get inet address.");
-            System.exit(0);
-        }
-
-        String myID = address + ":" + "AllstoresDatabaseServer";
+        String myID = zooKeeperHost + ":" + "AllstoresDatabaseServer";
         System.out.println(myID);
     }
 
