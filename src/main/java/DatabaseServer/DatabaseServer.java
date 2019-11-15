@@ -40,14 +40,14 @@ public class DatabaseServer {
 
         String znodePath = zooKeeper.create("/db/clients/", "".getBytes(), ZooDefs.Ids.READ_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
         String[] znodePathSplit = znodePath.split("/");
-        int sequentialNumber = Integer.parseInt(znodePathSplit[znodePathSplit.length - 1].replace("0",""));
-        int zookeeperId = Integer.parseInt(new String(zooKeeper.getData("/db", false, appStat)))
-        int port = zookeeperId + sequentialNumber;
+        int zooKeeperId = Integer.parseInt(znodePathSplit[znodePathSplit.length - 1].replace("0",""));
+        int basePort = Integer.parseInt(new String(zooKeeper.getData("/db", false, appStat)));
+        int port = basePort + zooKeeperId;
 
         // port must be higher than 15500 so it doesn't collide with AllStoresApp
         assert port > 15500;
 
-        IDataBase database = new DatabaseImpl(zooKeeper, zookeeperId);
+        IDataBase database = new DatabaseImpl(zooKeeper, zooKeeperId);
 
         /* Create registry and rebind it to port DATABASE_PORT */
         Registry registry = null;
