@@ -6,13 +6,13 @@ import org.apache.zookeeper.data.Stat;
 import java.util.List;
 
 public class ZooKeeperClientExample {
-    private static ZooKeeperConnector zooKeeperManager;
+    private static ZooKeeperConnector zooKeeperConnector = new ZooKeeperConnector();
     private static ZooKeeper zooKeeper;
     private static Watcher childrenChangedWatcher;
     private static AsyncCallback.ChildrenCallback childrenCallBack;
 
     public static void main(String[] args) throws Exception {
-        zooKeeper = zooKeeperManager.connect("127.0.0.1");
+        zooKeeper = zooKeeperConnector.connect("127.0.0.1");
 
         print("Strings sem fazer nada ao ZooKeeper");
         Stat stat = zooKeeper.exists("/", false);
@@ -27,12 +27,12 @@ public class ZooKeeperClientExample {
         Stat no1Stat = zooKeeper.exists("/", false);
         assert no1Stat != null;
 
-        byte[] b = zooKeeper.getData("/No1", false, null);
+        /*byte[] b = zooKeeper.getData("/No1", false, null);
         String result = new String(b);
         print(String.format("Data do no criado: %s", result));
-
-        //childrenUpdateDemo();
-        //Thread.sleep(15000);
+        */
+        childrenUpdateDemo();
+        Thread.sleep(60000);
 
         zooKeeper.delete("/No1", stat.getVersion());
     }
@@ -42,12 +42,13 @@ public class ZooKeeperClientExample {
             if (watchedEvent.getType() == Watcher.Event.EventType.NodeChildrenChanged) {
                 try {
                     printList(zooKeeper.getChildren(watchedEvent.getPath(), null));
+                    childrenUpdateDemo();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
         };
-        childrenCallBack = new AsyncCallback.ChildrenCallback() {
+        /*childrenCallBack = new AsyncCallback.ChildrenCallback() {
             public void processResult(int rc, String path, Object ctx, List<String> children) {
                 switch (KeeperException.Code.get(rc)) {
                     case CONNECTIONLOSS:
@@ -64,12 +65,12 @@ public class ZooKeeperClientExample {
                         print("getChildren failed");
                 }
             }
-        };
+        };*/
         printList(zooKeeper.getChildren("/", childrenChangedWatcher));
     }
 
-    public static void getUpdatedChildren() {
-        zooKeeper.getChildren("/No1", childrenChangedWatcher, childrenCallBack, null);
+    public static void getUpdatedChildren() throws KeeperException, InterruptedException {
+        zooKeeper.getChildren("/No1", childrenChangedWatcher); //, childrenCallBack, null);
     }
 
     public static void print(String s) {
