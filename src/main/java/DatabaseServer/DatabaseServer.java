@@ -7,14 +7,12 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 
 // import zookeeper classes
 import org.apache.zookeeper.*;
-import org.apache.zookeeper.Watcher.Event.KeeperState;
-import org.apache.zookeeper.AsyncCallback.StatCallback;
-import org.apache.zookeeper.KeeperException.Code;
 import org.apache.zookeeper.data.Stat;
 
 public class DatabaseServer {
@@ -44,9 +42,12 @@ public class DatabaseServer {
         int zooKeeperId = Integer.parseInt(znodePathSplit[znodePathSplit.length - 1].replace("0",""));
         int basePort = Integer.parseInt(new String(zooKeeper.getData("/db", false, appStat)));
         int port = basePort + zooKeeperId;
+        String host = InetAddress.getLocalHost().getHostAddress();
 
         // port must be higher than 15500 so it doesn't collide with AllStoresApp
         assert port > 15500;
+
+        zooKeeper.setData(znodePath, String.format("%s:%d", host, port).getBytes(),1);
 
         IDataBase database = new DatabaseImpl(zooKeeper, zooKeeperId);
 
