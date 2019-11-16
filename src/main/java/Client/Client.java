@@ -1,26 +1,87 @@
 package Client;
 import AllStoresServer.Interfaces.AllStoresServerInterface;
+import ZooKeeper.ZooKeeperConnector;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
+import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import java.util.Scanner;
+
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.data.Stat;
 
 public class Client {
 
-	private static final int ALLSTORES_PORT = 1099;
+	private static ZooKeeperConnector zooKeeperConnector;
+
+	private static final String FILE_SEPARATOR = File.separator;
+	// property fetches the home path
+	private static final String ZK_PATH = System.getProperty("user.home")
+			+ FILE_SEPARATOR + "AllstoresDB" + FILE_SEPARATOR;
+
+	private static Random random;
+
+	private static List<String> getNumberOfChildren(ZooKeeper zooKeeper) {
+		try {
+			Stat stat = zooKeeper.exists(ZK_PATH.concat("app"), false);
+			if(stat != null) {
+				// fetch all children from /app
+				List<String> childrenList = zooKeeper.getChildren(ZK_PATH.concat("app"), false);
+				Collections.sort(childrenList);
+
+				return childrenList;
+			} else { System.out.println("Node does not exist."); } 
+		} catch (Exception e) { System.out.println(e.getMessage()); }
+
+		return null;
+	}
+
+	private static int getAppServerPort(ZooKeeper zooKeeper) {
+		int port = 0;
+
+		try {
+			List<String> children = getNumberOfChildren(zooKeeper);
+
+			int child = random.nextInt(children.size());
+			String znode = children.get(child);
+
+			byte[] bp = zooKeeper.getData(ZK_PATH.concat("app").concat(FILE_SEPARATOR).concat(znode), false, null);
+			String s = new String(bp);
+			String[] data = s.split(":");
+
+			if(data.length == 2) {
+				port = Integer.parseInt(data[1]);
+				return port;
+			}
+		} catch (Exception e) { System.out.println(e.getMessage()); }
+
+		return port;
+	}
 
 	public static void main(String[] args) throws Exception {
 
+		random = new Random();
 		String host = "127.0.0.1"; // default host
 		AllStoresServerInterface allStoresServer = null;
-		int clientID, storeID, productID, quantity;
+		int clientID, storeID, productID, quantity, port;
 
 		try {
 
+			String zooKeeperHost = getZooKeeperHost();
+			ZooKeeper zooKeeper = zooKeeperConnector.connect(zooKeeperHost);
+
+			// getting a random app server port
+			port = getAppServerPort(zooKeeper);
+
 			// getting the registry and looking up the registry for the remote object
-			Registry registry = LocateRegistry.getRegistry(host, ALLSTORES_PORT);
+			Registry registry = LocateRegistry.getRegistry(host, port);
 			allStoresServer = (AllStoresServerInterface) registry.lookup("ClientServerInterface");
 
 			while(true) {
@@ -171,7 +232,12 @@ public class Client {
 		return sb.toString();
 	}
 
-
+	private static String getZooKeeperHost() throws IOException {
+		BufferedReader fileReader = new BufferedReader(new FileReader(ZK_PATH + "conf.cfg"));
+		String result = fileReader.readLine();
+		fileReader.close();
+		return result;
+	}
 
 	private static boolean tryParseInt(String n) {
 		try {
