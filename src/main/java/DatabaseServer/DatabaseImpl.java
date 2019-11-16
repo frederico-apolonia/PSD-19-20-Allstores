@@ -56,8 +56,12 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         }
 
         if (this.numberClients != 1) {
-            // todo
-            return;
+            /*
+             * If number of clients is different than 1, it means that there are more clients already alive
+             * and controlling the data. We need to wait for them to prepare our data to be able to
+             * set and run our shard
+             */
+            waitAndReadStores();
         } else {
             System.out.println("Server path: " + ALLSTORES_DB_PATH);
             File serverDir = new File(ALLSTORES_DB_PATH);
@@ -84,6 +88,36 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         setDbsChangedWatcher();
     }
 
+    private void waitAndReadStores() throws Exception {
+        // sleep 2 seconds to let the other servers notice us and start working on our data
+        Thread.sleep(1000);
+        String myNode = this.zooKeeper.create(String.format("/db/shared/read-%d", this.zooKeeperId), "".getBytes(),
+                ZooDefs.Ids.READ_ACL_UNSAFE, CreateMode.EPHEMERAL);
+
+        List<String> currentWaiters = this.zooKeeper.getChildren("/db/shared/", false);
+        currentWaiters.removeIf(s -> s.contains("read"));
+        // order waiters list; WARNING: will work with numbers from 1 to 9, above it things might go wrong!
+        File myStores = new File(SHARED_PATH);
+        if (currentWaiters.size() == 0) {
+            loadShops(myStores);
+        } else {
+            currentWaiters.sort(String::compareTo);
+            String lastWriter = "/db/shared/" + currentWaiters.get(currentWaiters.size() - 1);
+
+            zooKeeper.exists(Objects.requireNonNull(lastWriter), event -> {
+                assert lastWriter.equals(event.getPath());
+
+                if (event.getType() == Watcher.Event.EventType.NodeDeleted) {
+                    try {
+                        loadShops(myStores);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
+        }
+    }
+
     private void setDbsChangedWatcher() throws Exception {
         this.dbsChangedWatcher = watchedEvent -> {
             System.out.println("Nodes changed!");
@@ -94,7 +128,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
                     List<String> currentWaiters = zooKeeper.getChildren(watchedEvent.getPath(), null);
                     if (currentWaiters.size() > this.numberClients) {
                         this.numberClients = currentWaiters.size();
-                        updateDbServers(currentWaiters);
+                        updateDbServers();
                     } /*else {
                         // next phase
                     }*/
@@ -107,10 +141,17 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         zooKeeper.getChildren("/", this.dbsChangedWatcher);
     }
 
-    private void updateDbServers(List<String> currentWaiters) throws KeeperException, InterruptedException, IOException {
+    private void updateDbServers() throws KeeperException, InterruptedException, IOException {
         String myNode = this.zooKeeper.create(String.format("/db/shared/write-%d", this.zooKeeperId), "".getBytes(),
                 ZooDefs.Ids.READ_ACL_UNSAFE, CreateMode.EPHEMERAL);
 
+        List<String> currentWaiters = this.zooKeeper.getChildren("/db/shared/", false);
+
+        List<String> readWaiters = new ArrayList<>(currentWaiters);
+        readWaiters.removeIf(s -> !s.contains("read"));
+        if (readWaiters.size() > 1) Thread.sleep(1000);
+
+        currentWaiters.removeIf(s -> s.contains("read"));
         // order waiters list; WARNING: will work with numbers from 1 to 9, above it things might go wrong!
         currentWaiters.sort(String::compareTo);
 
