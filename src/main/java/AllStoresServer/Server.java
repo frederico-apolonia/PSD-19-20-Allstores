@@ -41,8 +41,7 @@ public class Server {
 		// port must be lower than 15500 so it doesn't collide with DB
 		assert port < 15500;
 
-		// todo esta parte agora já não se processa assim!!
-		AllStoresServerInterface testing = new AllStoresServerImp(!!, !!);
+		AllStoresServerInterface testing = new AllStoresServerImp(zooKeeper);
 		
 		Registry registry =  null;
 		try {

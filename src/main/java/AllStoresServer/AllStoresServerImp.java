@@ -16,6 +16,7 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.zookeeper.ZooKeeper;
@@ -26,78 +27,86 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 	private String databaseHost;
 	private int databasePort;
 	private ZooKeeper zooKeeper;
-	
+
 	private static final int NUMBER_OF_STORES = 600;
 	private static final String FILE_SEPARATOR = File.separator;
 	// property fetches the home path
 	private static final String ZK_PATH = System.getProperty("user.home")
 			+ FILE_SEPARATOR + "AllstoresDB" + FILE_SEPARATOR;
-	
-	public AllStoresServerImp(ZooKeeper zooKeeper, int databasePort) throws Exception {
+
+	public AllStoresServerImp(ZooKeeper zooKeeper) throws Exception {
 		this.zooKeeper = zooKeeper;
-		this.databasePort = databasePort;
+	}
+
+	private List<String> getNumberOfChildren() {
+		try {
+			Stat stat = zooKeeper.exists(ZK_PATH.concat("db"), false);
+			if(stat != null) {
+				// fetch all children from /db
+				List<String> childrenList = zooKeeper.getChildren(ZK_PATH.concat("db"), false);
+				Collections.sort(childrenList);
+
+				return childrenList;
+			} else { System.out.println("Node does not exist."); } 
+		} catch (Exception e) { System.out.println(e.getMessage()); }
+
+		return null;
+	}
+
+	private String findDatabaseServer(int storeID) throws RemoteException, NotBoundException {
+		try {
+			List<String> children = getNumberOfChildren();
+
+			int inf = 0;
+			for (int i = 1; i <= children.size(); i++) {
+				int sup = (NUMBER_OF_STORES * i) / children.size();
+
+				if(storeID > inf && storeID <= sup) {
+					//get the znode related to the storeID
+					String znode = children.get(i-1);
+					return znode;
+				} else {
+					inf = sup;
+				}
+			}
+		} catch (Exception e) { }
+
+		return null;
 	}
 
 	/*
 	 * Looks up and connects to the registry
 	 */
-	private IDataBase connectToDatabaseServer() throws RemoteException, NotBoundException {
-		Registry registry = LocateRegistry.getRegistry(this.databaseHost, this.databasePort);
-		return (IDataBase) registry.lookup("AllstoresDatabaseServer");
-	}
-	
-	/*
-	 * Looks up and connects to the registry based on store ID
-	 */
-	private IDataBase connectToDatabaseServer(int storeID) throws RemoteException, NotBoundException {
-		
+	private IDataBase connectToDatabaseServer(String znode) throws RemoteException, NotBoundException {
+
 		try {
-			Stat stat = zooKeeper.exists(ZK_PATH.concat("db"), false);
-			if(stat != null) {
-				// fetch all children from /db
-				List<String> children = zooKeeper.getChildren(ZK_PATH.concat("db"), false);
-				
-				int inf = 0;
-				for (int i = 1; i <= children.size(); i++) {
-					int sup = (NUMBER_OF_STORES * i) / children.size();
-					
-					if(storeID > inf && storeID <= sup) {
-						//get the znode related to the storeID
-						String znode = children.get(i-1);
-						
-						//get the data associated with znode, that will give "host:port" of db server
-						byte[] bp = zooKeeper.getData(ZK_PATH.concat("db").concat(FILE_SEPARATOR).concat(znode), false, null);
-						String s = new String(bp);
-						
-						//com setData(path, "host:port".getBytes(), version) no znode do servidor db quando se conecta??
-						String[] data = s.split(":");
-						
-						if(data.length == 2) {
-							databaseHost = data[0];
-							databasePort = Integer.parseInt(data[1]);
-							
-							Registry registry = LocateRegistry.getRegistry(databaseHost, databasePort);
-							return (IDataBase) registry.lookup("AllstoresDatabaseServer");
-						}
-						
-					} else {
-						inf = sup;
-					}
-				} 
-				
-			} else { System.out.println("Node does not exist."); }
-			
+			//get the data associated with znode, that will give "host:port" of db server
+			byte[] bp = zooKeeper.getData(ZK_PATH.concat("db").concat(FILE_SEPARATOR).concat(znode), false, null);
+			String s = new String(bp);
+
+			//com setData(path, "host:port".getBytes(), version) no znode do servidor db quando se conecta??
+			String[] data = s.split(":");
+
+			if(data.length == 2) {
+				databaseHost = data[0];
+				databasePort = Integer.parseInt(data[1]);
+
+				Registry registry = LocateRegistry.getRegistry(databaseHost, databasePort);
+				return (IDataBase) registry.lookup("AllstoresDatabaseServer");
+			}
 		} catch (Exception e) { System.out.println(e.getMessage()); }
-		
+
 		return null;
 	}
 
 	public String addReservation(int storeID, int productID, int quantity, int clientID) throws RemoteException {
-
+		String znodeServer;
 		IDataBase connectionDB;
 		StringBuilder message = new StringBuilder();
+		
 		try {
-			connectionDB = connectToDatabaseServer(storeID);
+			znodeServer = findDatabaseServer(storeID);
+			connectionDB = connectToDatabaseServer(znodeServer);
 
 			// find the product
 			Product product = getProductFromList(connectionDB.getShopProducts(storeID), productID);
@@ -113,7 +122,7 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 						} else {
 							message.append("There was a problem while updating your reservation.\n");
 						}
-					// client doesn't have an existing reservation for this product
+						// client doesn't have an existing reservation for this product
 					} else {
 						reservation = new Reservation(clientID, storeID, productID, quantity);
 
@@ -126,7 +135,7 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 					int remainingAvailable = product.getAvailable() - quantity;
 					message.append(String.format("Remaining stock: %d", remainingAvailable));
 					return message.toString();
-				// not enough stock to fulfill this reservation request
+					// not enough stock to fulfill this reservation request
 				}  else {
 					message.append("There's no available stock to fulfill your request.");
 					message.append(String.format("Remaining stock: %d", product.getAvailable()));
@@ -142,24 +151,27 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 		return message.append("Server is Down.").toString();
 	}
 
+
 	public List<String> cancel(int clientID) throws RemoteException {
-		IDataBase connectionBD;
+		IDataBase connectionDB;
 		boolean result = false;
 		List<String> returnReserves = new ArrayList<>();
 
 		try {
-			connectionBD = connectToDatabaseServer();
+			List<String> children = getNumberOfChildren();
+			for (int i = 0; i < children.size(); i++) {
+				connectionDB = connectToDatabaseServer(children.get(i));
 
-			// obtem todas as reservas
-			List<Reservation> clientReservations = connectionBD.getClientReservations(clientID);
-			
-			if(clientReservations.size() != 0) {
-				for (Reservation r : clientReservations) {
-					returnReserves.add(String.format("Product ID %d: canceled %d products.", r.getProductID(),
-							r.getQuantity()));
+				List<Reservation> clientReservations = connectionDB.getClientReservations(clientID);
+
+				if(clientReservations.size() != 0) {
+					for (Reservation r : clientReservations) {
+						returnReserves.add(String.format("Product ID %d: canceled %d products.", r.getProductID(),
+								r.getQuantity()));
+					}
+					result = connectionDB.cancelAllReservations(clientID);
 				}
-				result = connectionBD.cancelAllReservations(clientID);
-			}
+			} 
 		} catch (Exception e) {
 			System.err.println("Error while connecting to Database Server");
 			e.printStackTrace();
@@ -172,13 +184,16 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 	public List<String> getList(int storeID) throws RemoteException {
 		// devolve uma lista com a informação de cada produto existente na loja
 		// <storeID>
+		String znodeServer;
 		IDataBase connectionDB;
 		List<String> stockList = new ArrayList<String>();
 
 		try {
-			connectionDB = connectToDatabaseServer(storeID);
+			znodeServer = findDatabaseServer(storeID);
+			connectionDB = connectToDatabaseServer(znodeServer);
+
 			List<Product> listaProd = connectionDB.getShopProducts(storeID); // vai buscar a lista de produtos da loja
-																				// pedida
+			// pedida
 			for (Product p : listaProd) {
 				stockList.add(p.toString()); // para cada produto na lista vai buscar a sua informação completa (String)
 			}
@@ -190,12 +205,15 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 		return stockList;
 	}
 
+
 	public String buy(int clientID, int storeID, int productID, int quantity) throws RemoteException {
+		String znodeServer;
 		IDataBase connectionDB;
 		StringBuilder sb = new StringBuilder();
 
 		try {
-			connectionDB = connectToDatabaseServer(storeID);
+			znodeServer = findDatabaseServer(storeID);
+			connectionDB = connectToDatabaseServer(znodeServer);
 			Product product = getProductFromList(connectionDB.getShopProducts(storeID), productID);
 
 			if(product != null) {
@@ -257,6 +275,7 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 		return sb.toString();
 	}
 
+
 	private Product getProductFromList(List<Product> prodList, int productID) {
 		Product result = null;
 		for (Product p : prodList) {
@@ -273,30 +292,27 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 		List<String> soldList = new ArrayList<String>();
 
 		try {
-			connectionDB = connectToDatabaseServer();
+			List<String> children = getNumberOfChildren();
+			for (int i = 0; i < children.size(); i++) {
+				connectionDB = connectToDatabaseServer(children.get(i));
 
-			List<Reservation> reservedList = connectionDB.getClientReservations(clientID);
+				List<Reservation> reservedList = connectionDB.getClientReservations(clientID);
 
-			if (reservedList != null) {
-				for (Reservation r : reservedList) { // para cada reserva do cliente, efetua a compra
-					int prod = r.getProductID();
-					int qnt = r.getQuantity();
+				if (reservedList != null) {
+					for (Reservation r : reservedList) { // para cada reserva do cliente, efetua a compra
+						int prod = r.getProductID();
+						int qnt = r.getQuantity();
 
-					connectionDB.buyProduct(r.getShopID(), r.getProductID(), r.getQuantity(), clientID);
+						connectionDB.buyProduct(r.getShopID(), r.getProductID(), r.getQuantity(), clientID);
 
-					String info = "Produto " + prod + ", " + qnt + "unidades.";
-					soldList.add(info);
+						String info = "Produto " + prod + ", " + qnt + "unidades.";
+						soldList.add(info);
+					}
+				} else {
+					soldList.add(" ");
 				}
-
-				return soldList;
-
-			} else {
-
-				soldList.add(" ");
-				return soldList;
-
 			}
-
+			return soldList;
 		} catch (Exception e) {
 			System.err.println("Erro na conexão entre o ServerInTheMiddle e a BD!");
 			e.printStackTrace();
