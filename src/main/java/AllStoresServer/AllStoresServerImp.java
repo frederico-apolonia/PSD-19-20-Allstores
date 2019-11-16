@@ -24,8 +24,6 @@ import org.apache.zookeeper.data.Stat;
 
 public class AllStoresServerImp extends UnicastRemoteObject implements AllStoresServerInterface {
 
-	private String databaseHost;
-	private int databasePort;
 	private ZooKeeper zooKeeper;
 
 	private static final int NUMBER_OF_STORES = 600;
@@ -40,10 +38,10 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 
 	private List<String> getNumberOfChildren() {
 		try {
-			Stat stat = zooKeeper.exists(ZK_PATH.concat("db"), false);
+			Stat stat = zooKeeper.exists(ZK_PATH.concat("db/clients"), false);
 			if(stat != null) {
 				// fetch all children from /db
-				List<String> childrenList = zooKeeper.getChildren(ZK_PATH.concat("db"), false);
+				List<String> childrenList = zooKeeper.getChildren(ZK_PATH.concat("db/clients"), false);
 				Collections.sort(childrenList);
 
 				return childrenList;
@@ -81,15 +79,15 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 
 		try {
 			//get the data associated with znode, that will give "host:port" of db server
-			byte[] bp = zooKeeper.getData(ZK_PATH.concat("db").concat(FILE_SEPARATOR).concat(znode), false, null);
+			byte[] bp = zooKeeper.getData(ZK_PATH.concat("db/clients/").concat(znode), false, null);
 			String s = new String(bp);
 
 			//com setData(path, "host:port".getBytes(), version) no znode do servidor db quando se conecta??
 			String[] data = s.split(":");
 
 			if(data.length == 2) {
-				databaseHost = data[0];
-				databasePort = Integer.parseInt(data[1]);
+				String databaseHost = data[0];
+				int databasePort = Integer.parseInt(data[1]);
 
 				Registry registry = LocateRegistry.getRegistry(databaseHost, databasePort);
 				return (IDataBase) registry.lookup("AllstoresDatabaseServer");
