@@ -1,7 +1,7 @@
 package DatabaseServer;
 
 import DatabaseServer.Interfaces.IDataBase;
-import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.*;
 
 import java.io.*;
 import java.rmi.RemoteException;
@@ -18,7 +18,9 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
     // property fetches the home path
     private static final String ALLSTORES_DB_PATH = System.getProperty("user.home")
             + FILE_SEPARATOR + "AllstoresDB" + FILE_SEPARATOR;
+    private static final String SHARED_PATH = ALLSTORES_DB_PATH + "shared" + FILE_SEPARATOR;
     private String serverPath;
+    private String logPath;
 
     private HashMap<Integer, List<Product>> shops = new HashMap<>();
     private HashMap<Integer, List<Reservation>> reservations = new HashMap<>();
@@ -26,11 +28,13 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
     private ZooKeeper zooKeeper;
     private int zooKeeperId;
     private int numberClients = 0;
+    private Watcher dbsChangedWatcher;
 
     public DatabaseImpl(ZooKeeper zooKeeper, int zooKeeperId) throws Exception {
         this.zooKeeper = zooKeeper;
         this.zooKeeperId = zooKeeperId;
         this.serverPath = ALLSTORES_DB_PATH + zooKeeperId + FILE_SEPARATOR;
+        this.logPath = serverPath + "sales.log";
         initDataBase();
     }
 
@@ -39,7 +43,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
      * Checks first if there is a previous state of the database then loads it, else
      * creates a new one from scratch (600 stores, 20 products ea)
      */
-    private void initDataBase() throws IOException {
+    private void initDataBase() throws Exception {
 
         List<String> clients;
         try {
@@ -61,29 +65,136 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
             System.out.println("Checking if there is a previous state of the database...");
             if (serverDir.exists()) {
                 System.out.println("Version found! Loading the latest saved state");
-                loadShops(serverDir);
+                loadMultipleDBShops(serverDir);
             } else {
                 System.out.println("No version found, starting from scratch...");
                 for (int shopID = 1; shopID <= NUMBER_OF_STORES; shopID++) {
                     generateNewShop(shopID);
                 }
                 System.out.println("All shops generated!");
-                new File(ALLSTORES_DB_PATH).mkdir();
             }
+            new File(SHARED_PATH).mkdirs();
         }
         // creates server folder
         new File(serverPath).mkdirs();
         // creates sales log file
-        new File(serverPath + "sales.log").createNewFile();
-        writeStoresToDisk();
+        new File(logPath).createNewFile();
+        writeStoresToDisk(this.shops, this.serverPath);
+
+        setDbsChangedWatcher();
+    }
+
+    private void setDbsChangedWatcher() throws Exception {
+        this.dbsChangedWatcher = watchedEvent -> {
+            System.out.println("Nodes changed!");
+            if (watchedEvent.getType() == Watcher.Event.EventType.NodeChildrenChanged) {
+                assert watchedEvent.getPath().equals("/db/clients");
+
+                try {
+                    List<String> currentWaiters = zooKeeper.getChildren(watchedEvent.getPath(), null);
+                    if (currentWaiters.size() > this.numberClients) {
+                        this.numberClients = currentWaiters.size();
+                        updateDbServers(currentWaiters);
+                    } /*else {
+                        // next phase
+                    }*/
+                    setDbsChangedWatcher();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+        zooKeeper.getChildren("/", this.dbsChangedWatcher);
+    }
+
+    private void updateDbServers(List<String> currentWaiters) throws KeeperException, InterruptedException, IOException {
+        String myNode = this.zooKeeper.create(String.format("/db/shared/write-%d", this.zooKeeperId), "".getBytes(),
+                ZooDefs.Ids.READ_ACL_UNSAFE, CreateMode.EPHEMERAL);
+
+        // order waiters list; WARNING: will work with numbers from 1 to 9, above it things might go wrong!
+        currentWaiters.sort(String::compareTo);
+
+        // how many shop should each db have now?
+        int shopsPerStore = NUMBER_OF_STORES / this.numberClients;
+
+        if (currentWaiters.get(0).equals(String.format("write-%d", this.zooKeeperId))) {
+            // I am the first node, so I must check what I need to leave for the next node
+            // from shops per store + 1 to the end of the stores that I own must go
+            shareStoresFromDatabase(shopsPerStore);
+            this.zooKeeper.delete(myNode, this.zooKeeper.exists(myNode, false).getVersion());
+
+            // update files on disk
+            writeStoresToDisk(this.shops, this.serverPath);
+
+            // delete logs
+            BufferedWriter fileWriter = new BufferedWriter(new FileWriter(this.logPath));
+            fileWriter.write("");
+            fileWriter.close();
+        } else {
+            String beforeMyNode = null;
+            // find the path of who is behind me
+            for (int i = 1; i < currentWaiters.size(); i++) {
+                if (currentWaiters.get(i).equals(String.format("write-%d", this.zooKeeperId))) {
+                    beforeMyNode = "/db/shared/" + currentWaiters.get(i - 1);
+                    break;
+                }
+            }
+
+            String finalBeforeMyNode = beforeMyNode;
+            zooKeeper.exists(Objects.requireNonNull(beforeMyNode), event -> {
+                assert finalBeforeMyNode.equals(event.getPath());
+
+                if (event.getType() == Watcher.Event.EventType.NodeDeleted) {
+                    try {
+                        loadShops(new File(SHARED_PATH));
+
+                        shareStoresFromDatabase(shopsPerStore);
+                        this.zooKeeper.delete(myNode, this.zooKeeper.exists(myNode, false).getVersion());
+                        // update files on disk
+                        writeStoresToDisk(this.shops, this.serverPath);
+                        // delete logs
+                        BufferedWriter fileWriter = new BufferedWriter(new FileWriter(this.logPath));
+                        fileWriter.write("");
+                        fileWriter.close();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
+
+        }
 
     }
 
-    /**
-     * Loads shops from files
-     * @throws IOException
-     */
-    private void loadShops(File serverDir) throws IOException {
+    private void shareStoresFromDatabase(int startingPosition) throws IOException {
+        HashMap<Integer, List<Product>> dumpStores = new HashMap<>();
+        /*
+         * We need to get the shop ids because they won't always match the ids, for instance:
+         * Our server is in charge of shops 301 to 600, and we need to deliver 50 shops, our i
+         * will start at 250, but the ids start at 550. There's a difference between the
+         * iteration of the shopIds and the iteration variable
+         */
+        List<Integer> serverShopIds = new ArrayList<>(this.shops.keySet());
+
+        for (int i = startingPosition; i < serverShopIds.size(); i++) {
+            // gets the shopID at index i
+            int shopId = serverShopIds.get(i);
+
+            List<Product> shopProductsCopy = new ArrayList<>(this.shops.get(shopId));
+            dumpStores.put(shopId, shopProductsCopy);
+        }
+        writeStoresToDisk(dumpStores, SHARED_PATH);
+
+        // remove shops that are no longer owned by the server
+        for (int i = serverShopIds.size() - 1; i >= startingPosition; i--) {
+            // gets the shopID at index i
+            int shopId = serverShopIds.get(i);
+            // remove shop with the ID at index i
+            this.shops.remove(shopId);
+        }
+    }
+
+    private void loadMultipleDBShops(File serverDir) throws IOException {
         // we need to see if there is any "leftover" stores from previous runs
         File[] directories = serverDir.listFiles(File::isDirectory);
         assert directories != null;
@@ -92,33 +203,43 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
             // each directory is a previous run of a server shard
             for (File directory : directories) {
-                File[] shops = directory.listFiles((file, name) -> !name.equals("sales.log"));
-                assert shops != null;
-
-                // go tru each SHOP FILE and create a new shop with their items
-                for(File shop : shops) {
-                    int shopID = Integer.parseInt(shop.getName().split(".")[0]);
-                    BufferedReader fileReader = new BufferedReader(new FileReader(shop));
-                    List<Product> shopProducts = new ArrayList<>();
-
-                    for(int line = 0; line < NUM_PRODUCT_IDS; line++) {
-                        String[] shopQuantities = fileReader.readLine().split(" ");
-
-                        int productID = Integer.parseInt(shopQuantities[0]);
-                        int available = Integer.parseInt(shopQuantities[1]);
-                        int sold = Integer.parseInt(shopQuantities[2]);
-
-                        shopProducts.add(new Product(shopID, productID, available, sold));
-                    }
-                    fileReader.close();
-                    shop.delete();
-                    this.shops.put(shopID, shopProducts);
-                }
+                loadShops(directory);
                 // go to log and recover correct state
                 File logFile = Objects.requireNonNull(directory.listFiles((file, name) -> name.equals("sales.log")))[0];
                 updateProductsFromLogs(logFile);
                 logFile.delete();
                 directory.delete();
+            }
+        }
+    }
+
+    /**
+     * Loads shops from files
+     * @throws IOException
+     */
+    private void loadShops(File directory) throws IOException {
+        File[] shops = directory.listFiles((file, name) -> !name.equals("sales.log"));
+        if (shops != null) {
+            // go tru each SHOP FILE and create a new shop with their items
+            for(File shop : shops) {
+                int shopID = Integer.parseInt(shop.getName().split(".")[0]);
+                BufferedReader fileReader = new BufferedReader(new FileReader(shop));
+                List<Product> shopProducts = new ArrayList<>();
+
+                for(int line = 0; line < NUM_PRODUCT_IDS; line++) {
+                    String[] shopQuantities = fileReader.readLine().split(" ");
+
+                    int productID = Integer.parseInt(shopQuantities[0]);
+                    int available = Integer.parseInt(shopQuantities[1]);
+                    int sold = Integer.parseInt(shopQuantities[2]);
+
+                    shopProducts.add(new Product(shopID, productID, available, sold));
+                }
+                fileReader.close();
+                this.shops.put(shopID, shopProducts);
+            }
+            for (int i = shops.length - 1; i >= 0; i--) {
+                shops[i].delete();
             }
         }
     }
@@ -157,9 +278,9 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
     /**
      * Writes all stores to disk
      */
-    private void writeStoresToDisk() throws IOException {
-        for (int shop : this.shops.keySet()) {
-            writeStoreToDisk(shop, this.shops.get(shop));
+    private void writeStoresToDisk(HashMap<Integer, List<Product>> shops, String path) throws IOException {
+        for (int shop : shops.keySet()) {
+            writeStoreToDisk(shop, this.shops.get(shop), path);
         }
     }
 
@@ -168,8 +289,8 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
      * @param shopID
      * @param products
      */
-    private void writeStoreToDisk(int shopID, List<Product> products) throws IOException {
-        String shopPath = this.serverPath + shopID + ".shop";
+    private void writeStoreToDisk(int shopID, List<Product> products, String path) throws IOException {
+        String shopPath = path + shopID + ".shop";
         BufferedWriter writer = new BufferedWriter(new FileWriter(shopPath, false));
         for(Product p : products) {
             writer.write(String.format("%d %d %d\n", p.getProductID(), p.getAvailable(), p.getSold()));
@@ -179,7 +300,6 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
     }
 
     private boolean writeBuyToLog(int shopID, int productID, int quantity) throws IOException {
-        String logPath = ALLSTORES_DB_PATH + "sales.log";
 
         File logFile = new File(logPath);
         FileWriter fileWriter;
@@ -188,12 +308,12 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
                 double fileSize = logFile.length();
                 // if file size is larger than 1000000 bytes (1MB) then it's time to write the stores to disk
                 if(fileSize > 1000000) {
-                    writeStoresToDisk();
-                    fileWriter = new FileWriter(logPath, false);
+                    writeStoresToDisk(this.shops, this.serverPath);
+                    fileWriter = new FileWriter(this.logPath, false);
                     // guarantee that it is now empty
                     fileWriter.write("");
                 } else {
-                    fileWriter = new FileWriter(logPath, true);
+                    fileWriter = new FileWriter(this.logPath, true);
                 }
             } else {
                 fileWriter = new FileWriter(logPath);

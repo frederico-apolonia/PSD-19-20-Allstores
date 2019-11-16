@@ -35,6 +35,7 @@ public class DatabaseServer {
         if (appStat == null) {
             zooKeeper.create("/db", "15500".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             zooKeeper.create("/db/clients", "".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            zooKeeper.create("/db/shared", "".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             appStat = zooKeeper.exists("/db/clients", false);
         }
 
