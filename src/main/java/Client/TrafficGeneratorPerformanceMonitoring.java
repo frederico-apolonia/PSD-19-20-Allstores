@@ -20,7 +20,7 @@ import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
 
 public class TrafficGeneratorPerformanceMonitoring {
-	private static ZooKeeperConnector zooKeeperConnector;
+	private static ZooKeeperConnector zooKeeperConnector = new ZooKeeperConnector();
 
 	private static final String FILE_SEPARATOR = File.separator;
 	private static final String ZK_PATH = System.getProperty("user.home")
@@ -34,7 +34,6 @@ public class TrafficGeneratorPerformanceMonitoring {
 
 	private static boolean stopThreads = false;
 	private static int elapsedTime;
-	private static Random randomApp;
 
 	private static class Options {
 		int numberClients;
@@ -57,7 +56,8 @@ public class TrafficGeneratorPerformanceMonitoring {
 		private final int clientID;
 		private final AllStoresServerInterface allStoresServer;
 		private ThreadResult result = new ThreadResult();
-		private String[] znodeData;
+		private String randomAppServer, host;
+		private int port;
 
 		ClientThread(boolean writeMode, int singleStore, int clientID) throws RemoteException, NotBoundException, IOException, InterruptedException {
 			this.writeMode = writeMode;
@@ -67,10 +67,13 @@ public class TrafficGeneratorPerformanceMonitoring {
 			String zooKeeperHost = getZooKeeperHost();
 			ZooKeeper zooKeeper = zooKeeperConnector.connect(zooKeeperHost);
 
-			// getting a random app server to connect
-			znodeData = findAppServer(zooKeeper);
-			String host = znodeData[0];
-			int port = Integer.parseInt(znodeData[1]);
+			// getting a random app server
+			randomAppServer = findAppServer(zooKeeper);
+			assert randomAppServer != null;
+			String[] appServerSplit = randomAppServer.split(":");
+			assert appServerSplit.length == 2;
+			host = appServerSplit[0];
+			port = Integer.parseInt(appServerSplit[1]);
 
 			Registry registry = LocateRegistry.getRegistry(host, port);
 			this.allStoresServer = (AllStoresServerInterface) registry.lookup(ALLSTORES_REGISTRY_NAME);
@@ -291,21 +294,17 @@ public class TrafficGeneratorPerformanceMonitoring {
 		return result;
 	}
 
-	private static String[] findAppServer(ZooKeeper zooKeeper) {
-		randomApp = new Random();
+	private static String findAppServer(ZooKeeper zooKeeper) {
+		Random randomApp = new Random();
 
 		try {
 			List<String> children = getNumberOfChildren(zooKeeper);
-
+			assert children != null;
 			int child = randomApp.nextInt(children.size());
 			String znode = children.get(child);
 
-			byte[] bp = zooKeeper.getData(ZK_PATH.concat("app").concat(FILE_SEPARATOR).concat(znode), false, null);
-			String s = new String(bp);
-			String[] data = s.split(":");
-
-			if(data.length == 2)
-				return data;
+			byte[] bp = zooKeeper.getData("/app/".concat(znode), false, null);
+			return new String(bp);
 
 		} catch (Exception e) { System.out.println(e.getMessage()); }
 
@@ -314,10 +313,10 @@ public class TrafficGeneratorPerformanceMonitoring {
 
 	private static List<String> getNumberOfChildren(ZooKeeper zooKeeper) {
 		try {
-			Stat stat = zooKeeper.exists(ZK_PATH.concat("app"), false);
+			Stat stat = zooKeeper.exists("/app", false);
 			if(stat != null) {
 				// fetch all children from /app
-				List<String> childrenList = zooKeeper.getChildren(ZK_PATH.concat("app"), false);
+				List<String> childrenList = zooKeeper.getChildren("/app", false);
 				Collections.sort(childrenList);
 
 				return childrenList;

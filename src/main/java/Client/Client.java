@@ -25,29 +25,6 @@ public class Client {
 	private static final String ZK_PATH = System.getProperty("user.home")
 			+ FILE_SEPARATOR + "AllstoresDB" + FILE_SEPARATOR;
 
-	private static Random randomApp;
-
-	private static String[] findAppServer(ZooKeeper zooKeeper) {
-		randomApp = new Random();
-
-		try {
-			List<String> children = getNumberOfChildren(zooKeeper);
-
-			int child = randomApp.nextInt(children.size());
-			String znode = children.get(child);
-
-			byte[] bp = zooKeeper.getData(ZK_PATH.concat("app").concat(FILE_SEPARATOR).concat(znode), false, null);
-			String s = new String(bp);
-			String[] data = s.split(":");
-
-			if(data.length == 2)
-				return data;
-
-		} catch (Exception e) { System.out.println(e.getMessage()); }
-
-		return null;
-	}
-
 	private static List<String> getNumberOfChildren(ZooKeeper zooKeeper) {
 		try {
 			Stat stat = zooKeeper.exists("/app", false);
@@ -64,7 +41,6 @@ public class Client {
 	}
 
 	private static String getAppServerPort(ZooKeeper zooKeeper) {
-		int port = 0;
 		Random random = new Random();
 
 		try {
@@ -85,7 +61,6 @@ public class Client {
 		AllStoresServerInterface allStoresServer = null;
 		String randomAppServer, host;
 		int clientID, storeID, productID, quantity, port;
-		String[] znodeData;
 
 		try {
 
