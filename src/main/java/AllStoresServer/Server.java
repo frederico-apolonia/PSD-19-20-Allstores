@@ -38,7 +38,7 @@ public class Server {
 		String[] znodePathSplit = znodePath.split("/");
 
 		String zooKeeperIdString = znodePathSplit[znodePathSplit.length - 1];
-		int zooKeeperId = zooKeeperIdString.equals("") ? 0 : Integer.parseInt(zooKeeperIdString);
+		int zooKeeperId = Integer.parseInt(zooKeeperIdString.replaceFirst("^0+(?!$)", ""));
 		int basePort = Integer.parseInt(new String(zooKeeper.getData("/app", false, appStat)));
 		int port = basePort + zooKeeperId;
 		String host = InetAddress.getLocalHost().getHostAddress();

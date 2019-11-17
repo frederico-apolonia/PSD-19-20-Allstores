@@ -63,6 +63,10 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 					this.dbServers.put(serverId, serverHost);
 				}
 			}
+			System.out.println("Detected database servers:");
+			for (int i: this.dbServers.keySet()) {
+				System.out.println(String.format("Server with id %d: %s", i, this.dbServers.get(i)));
+			}
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -75,6 +79,11 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 		Watcher dbsChangedWatcher = watchedEvent -> {
 			if (watchedEvent.getType() == Watcher.Event.EventType.NodeChildrenChanged) {
 				assert watchedEvent.getPath().equals("/db/clients");
+				try {
+					Thread.sleep(250);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
 				// todo doesn't account for when number of server dbs goes down!
 				fetchDbServers();
 

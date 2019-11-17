@@ -39,9 +39,9 @@ public class DatabaseServer {
 
         String znodePath = zooKeeper.create("/db/clients/", "".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
         String[] znodePathSplit = znodePath.split("/");
-        String zooKeeperIdString = znodePathSplit[znodePathSplit.length - 1].replace("0","");
+        String zooKeeperIdString = znodePathSplit[znodePathSplit.length - 1];
         System.out.println("ID: " + zooKeeperIdString);
-        int zooKeeperId = zooKeeperIdString.equals("") ? 0 : Integer.parseInt(zooKeeperIdString);
+        int zooKeeperId = Integer.parseInt(zooKeeperIdString.replaceFirst("^0+(?!$)", ""));
         int basePort = Integer.parseInt(new String(zooKeeper.getData("/db", false, appStat)));
         int port = basePort + zooKeeperId;
         String host = InetAddress.getLocalHost().getHostAddress();
