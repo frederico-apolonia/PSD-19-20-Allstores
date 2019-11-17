@@ -67,7 +67,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
             File serverDir = new File(ALLSTORES_DB_PATH);
             // check if there is a previous version of the server
             System.out.println("Checking if there is a previous state of the database...");
-            if (serverDir.exists()) {
+            if (Objects.requireNonNull(serverDir.listFiles(File::isDirectory)).length > 1) {
                 System.out.println("Version found! Loading the latest saved state");
                 loadMultipleDBShops(serverDir);
             } else {
@@ -94,7 +94,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         String myNode = this.zooKeeper.create(String.format("/db/shared/read-%d", this.zooKeeperId), "".getBytes(),
                 ZooDefs.Ids.READ_ACL_UNSAFE, CreateMode.EPHEMERAL);
 
-        List<String> currentWaiters = this.zooKeeper.getChildren("/db/shared/", false);
+        List<String> currentWaiters = this.zooKeeper.getChildren("/db/shared", false);
         currentWaiters.removeIf(s -> s.contains("read"));
         // order waiters list; WARNING: will work with numbers from 1 to 9, above it things might go wrong!
         File myStores = new File(SHARED_PATH);
@@ -110,6 +110,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
                 if (event.getType() == Watcher.Event.EventType.NodeDeleted) {
                     try {
                         loadShops(myStores);
+                        this.zooKeeper.delete(myNode, this.zooKeeper.exists(myNode, false).getVersion());
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -119,6 +120,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
     }
 
     private void setDbsChangedWatcher() throws Exception {
+        System.out.println("Setting dbs changed watcher...");
         this.dbsChangedWatcher = watchedEvent -> {
             System.out.println("Nodes changed!");
             if (watchedEvent.getType() == Watcher.Event.EventType.NodeChildrenChanged) {
@@ -138,14 +140,14 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
                 }
             }
         };
-        zooKeeper.getChildren("/", this.dbsChangedWatcher);
+        zooKeeper.getChildren("/db/clients", this.dbsChangedWatcher);
     }
 
     private void updateDbServers() throws KeeperException, InterruptedException, IOException {
         String myNode = this.zooKeeper.create(String.format("/db/shared/write-%d", this.zooKeeperId), "".getBytes(),
                 ZooDefs.Ids.READ_ACL_UNSAFE, CreateMode.EPHEMERAL);
 
-        List<String> currentWaiters = this.zooKeeper.getChildren("/db/shared/", false);
+        List<String> currentWaiters = this.zooKeeper.getChildren("/db/shared", false);
 
         List<String> readWaiters = new ArrayList<>(currentWaiters);
         readWaiters.removeIf(s -> !s.contains("read"));
@@ -164,6 +166,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
             shareStoresFromDatabase(shopsPerStore);
             this.zooKeeper.delete(myNode, this.zooKeeper.exists(myNode, false).getVersion());
 
+            deleteStoresOnDisk(this.serverPath);
             // update files on disk
             writeStoresToDisk(this.shops, this.serverPath);
 
@@ -191,6 +194,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
                         shareStoresFromDatabase(shopsPerStore);
                         this.zooKeeper.delete(myNode, this.zooKeeper.exists(myNode, false).getVersion());
+                        deleteStoresOnDisk(this.serverPath);
                         // update files on disk
                         writeStoresToDisk(this.shops, this.serverPath);
                         // delete logs
@@ -207,6 +211,14 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
     }
 
+    private void deleteStoresOnDisk(String serverPath) {
+        File[] shops = new File(serverPath).listFiles();
+        for (int i = shops.length - 1; i >= 0; i--) {
+            if(!shops[i].getName().contains("sales.log"))
+                shops[i].delete();
+        }
+    }
+
     private void shareStoresFromDatabase(int startingPosition) throws IOException {
         HashMap<Integer, List<Product>> dumpStores = new HashMap<>();
         /*
@@ -216,6 +228,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
          * iteration of the shopIds and the iteration variable
          */
         List<Integer> serverShopIds = new ArrayList<>(this.shops.keySet());
+        serverShopIds.sort(Integer::compareTo);
 
         for (int i = startingPosition; i < serverShopIds.size(); i++) {
             // gets the shopID at index i
@@ -244,12 +257,14 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
             // each directory is a previous run of a server shard
             for (File directory : directories) {
-                loadShops(directory);
-                // go to log and recover correct state
-                File logFile = Objects.requireNonNull(directory.listFiles((file, name) -> name.equals("sales.log")))[0];
-                updateProductsFromLogs(logFile);
-                logFile.delete();
-                directory.delete();
+                if (!directory.getName().equals("shared")) {
+                    loadShops(directory);
+                    // go to log and recover correct state
+                    File logFile = directory.listFiles()[0];
+                    updateProductsFromLogs(logFile);
+                    logFile.delete();
+                    directory.delete();
+                }
             }
         }
     }
@@ -259,28 +274,33 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
      * @throws IOException
      */
     private void loadShops(File directory) throws IOException {
-        File[] shops = directory.listFiles((file, name) -> !name.equals("sales.log"));
+        File[] shops = directory.listFiles();
         if (shops != null) {
             // go tru each SHOP FILE and create a new shop with their items
             for(File shop : shops) {
-                int shopID = Integer.parseInt(shop.getName().split(".")[0]);
-                BufferedReader fileReader = new BufferedReader(new FileReader(shop));
-                List<Product> shopProducts = new ArrayList<>();
+                if (!shop.getName().contains("sales.log")) {
+                    String shopFile = shop.getName();
+                    String[] shopFileSplit = shopFile.split(".shop");
+                    int shopID = Integer.parseInt(shopFileSplit[0]);
+                    BufferedReader fileReader = new BufferedReader(new FileReader(shop));
+                    List<Product> shopProducts = new ArrayList<>();
 
-                for(int line = 0; line < NUM_PRODUCT_IDS; line++) {
-                    String[] shopQuantities = fileReader.readLine().split(" ");
+                    for(int line = 0; line < NUM_PRODUCT_IDS; line++) {
+                        String[] shopQuantities = fileReader.readLine().split(" ");
 
-                    int productID = Integer.parseInt(shopQuantities[0]);
-                    int available = Integer.parseInt(shopQuantities[1]);
-                    int sold = Integer.parseInt(shopQuantities[2]);
+                        int productID = Integer.parseInt(shopQuantities[0]);
+                        int available = Integer.parseInt(shopQuantities[1]);
+                        int sold = Integer.parseInt(shopQuantities[2]);
 
-                    shopProducts.add(new Product(shopID, productID, available, sold));
+                        shopProducts.add(new Product(shopID, productID, available, sold));
+                    }
+                    fileReader.close();
+                    this.shops.put(shopID, shopProducts);
                 }
-                fileReader.close();
-                this.shops.put(shopID, shopProducts);
             }
             for (int i = shops.length - 1; i >= 0; i--) {
-                shops[i].delete();
+                if(!shops[i].getName().contains("sales.log"))
+                    shops[i].delete();
             }
         }
     }

@@ -37,9 +37,11 @@ public class DatabaseServer {
             appStat = zooKeeper.exists("/db/clients", false);
         }
 
-        String znodePath = zooKeeper.create("/db/clients/", "".getBytes(), ZooDefs.Ids.READ_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+        String znodePath = zooKeeper.create("/db/clients/", "".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
         String[] znodePathSplit = znodePath.split("/");
-        int zooKeeperId = Integer.parseInt(znodePathSplit[znodePathSplit.length - 1].replace("0",""));
+        String zooKeeperIdString = znodePathSplit[znodePathSplit.length - 1].replace("0","");
+        System.out.println("ID: " + zooKeeperIdString);
+        int zooKeeperId = zooKeeperIdString.equals("") ? 0 : Integer.parseInt(zooKeeperIdString);
         int basePort = Integer.parseInt(new String(zooKeeper.getData("/db", false, appStat)));
         int port = basePort + zooKeeperId;
         String host = InetAddress.getLocalHost().getHostAddress();
@@ -47,7 +49,8 @@ public class DatabaseServer {
         // port must be higher than 15500 so it doesn't collide with AllStoresApp
         assert port > 15500;
 
-        zooKeeper.setData(znodePath, String.format("%s:%d", host, port).getBytes(),1);
+        zooKeeper.setData(znodePath, String.format("%s:%d", host, port).getBytes(),
+                zooKeeper.exists(znodePath, false).getVersion());
 
         IDataBase database = new DatabaseImpl(zooKeeper, zooKeeperId);
 
