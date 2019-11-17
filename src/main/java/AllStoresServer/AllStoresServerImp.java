@@ -105,18 +105,20 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 			int numberServers = this.dbServers.size();
 			int inf = 1;
 			int sup = NUMBER_OF_STORES / numberServers;
+			List<Integer> keyset = new ArrayList<>(this.dbServers.keySet());
 			boolean found = false;
-			for (int i = 1; i <= numberServers && !found; i++) {
+			for (int i = 0; i < numberServers && !found; i++) {
 
-				if(storeID > inf && storeID <= sup) {
+				if(storeID >= inf && storeID <= sup) {
 					//get the database address related to the storeID
-					result = this.dbServers.get(i);
+					result = this.dbServers.get(keyset.get(i));
 					found = true;
 				} else {
 					inf += sup;
 					sup += NUMBER_OF_STORES / numberServers;
 				}
 			}
+			return  result;
 		} catch (Exception e) { e.printStackTrace(); }
 
 		return result;
