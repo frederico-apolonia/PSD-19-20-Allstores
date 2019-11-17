@@ -3,6 +3,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.rmi.registry.LocateRegistry;
 import AllStoresServer.Interfaces.AllStoresServerInterface;
 import ZooKeeper.*;
@@ -38,9 +39,14 @@ public class Server {
 		int sequentialNumber = Integer.parseInt(znodePathSplit[znodePathSplit.length - 1].replace("0",""));
 		int port = Integer.parseInt(new String(zooKeeper.getData("/app", false, appStat))) + sequentialNumber;
 
+		String host = InetAddress.getLocalHost().getHostAddress();
+		
 		// port must be lower than 15500 so it doesn't collide with DB
 		assert port < 15500;
 
+		zooKeeper.setData(znodePath, String.format("%s:%d", host, port).getBytes(),
+                zooKeeper.exists(znodePath, false).getVersion());
+		
 		AllStoresServerInterface testing = new AllStoresServerImp(zooKeeper);
 		
 		Registry registry =  null;

@@ -51,6 +51,9 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 		return null;
 	}
 
+	/*
+	 * Finds DBServer that keeps the given store data
+	 */
 	private String findDatabaseServer(int storeID) throws RemoteException, NotBoundException {
 		try {
 			List<String> children = getNumberOfChildren();
@@ -60,7 +63,6 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 				int sup = (NUMBER_OF_STORES * i) / children.size();
 
 				if(storeID > inf && storeID <= sup) {
-					//get the znode related to the storeID
 					String znode = children.get(i-1);
 					return znode;
 				} else {
@@ -73,16 +75,15 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 	}
 
 	/*
-	 * Looks up and connects to the registry
+	 * Connects to DBServer given a znode data
 	 */
 	private IDataBase connectToDatabaseServer(String znode) throws RemoteException, NotBoundException {
 
 		try {
-			//get the data associated with znode, that will give "host:port" of db server
+			//get the data associated with given znode, that will give "host:port" of db server
 			byte[] bp = zooKeeper.getData(ZK_PATH.concat("db/clients/").concat(znode), false, null);
 			String s = new String(bp);
 
-			//com setData(path, "host:port".getBytes(), version) no znode do servidor db quando se conecta??
 			String[] data = s.split(":");
 
 			if(data.length == 2) {
@@ -101,7 +102,7 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 		String znodeServer;
 		IDataBase connectionDB;
 		StringBuilder message = new StringBuilder();
-		
+
 		try {
 			znodeServer = findDatabaseServer(storeID);
 			connectionDB = connectToDatabaseServer(znodeServer);

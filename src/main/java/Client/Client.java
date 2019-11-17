@@ -22,11 +22,31 @@ public class Client {
 	private static ZooKeeperConnector zooKeeperConnector;
 
 	private static final String FILE_SEPARATOR = File.separator;
-	// property fetches the home path
 	private static final String ZK_PATH = System.getProperty("user.home")
 			+ FILE_SEPARATOR + "AllstoresDB" + FILE_SEPARATOR;
 
-	private static Random random;
+	private static Random randomApp;
+
+	private static String[] findAppServer(ZooKeeper zooKeeper) {
+		randomApp = new Random();
+
+		try {
+			List<String> children = getNumberOfChildren(zooKeeper);
+
+			int child = randomApp.nextInt(children.size());
+			String znode = children.get(child);
+
+			byte[] bp = zooKeeper.getData(ZK_PATH.concat("app").concat(FILE_SEPARATOR).concat(znode), false, null);
+			String s = new String(bp);
+			String[] data = s.split(":");
+
+			if(data.length == 2)
+				return data;
+
+		} catch (Exception e) { System.out.println(e.getMessage()); }
+
+		return null;
+	}
 
 	private static List<String> getNumberOfChildren(ZooKeeper zooKeeper) {
 		try {
@@ -43,42 +63,21 @@ public class Client {
 		return null;
 	}
 
-	private static int getAppServerPort(ZooKeeper zooKeeper) {
-		int port = 0;
-
-		try {
-			List<String> children = getNumberOfChildren(zooKeeper);
-
-			int child = random.nextInt(children.size());
-			String znode = children.get(child);
-
-			byte[] bp = zooKeeper.getData(ZK_PATH.concat("app").concat(FILE_SEPARATOR).concat(znode), false, null);
-			String s = new String(bp);
-			String[] data = s.split(":");
-
-			if(data.length == 2) {
-				port = Integer.parseInt(data[1]);
-				return port;
-			}
-		} catch (Exception e) { System.out.println(e.getMessage()); }
-
-		return port;
-	}
-
 	public static void main(String[] args) throws Exception {
 
-		random = new Random();
-		String host = "127.0.0.1"; // default host
 		AllStoresServerInterface allStoresServer = null;
 		int clientID, storeID, productID, quantity, port;
+		String[] znodeData;
 
 		try {
 
 			String zooKeeperHost = getZooKeeperHost();
 			ZooKeeper zooKeeper = zooKeeperConnector.connect(zooKeeperHost);
 
-			// getting a random app server port
-			port = getAppServerPort(zooKeeper);
+			// getting a random app server to connect
+			znodeData = findAppServer(zooKeeper);
+			String host = znodeData[0];
+			port = Integer.parseInt(znodeData[1]);
 
 			// getting the registry and looking up the registry for the remote object
 			Registry registry = LocateRegistry.getRegistry(host, port);
