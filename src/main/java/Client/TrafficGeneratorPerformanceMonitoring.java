@@ -1,7 +1,12 @@
 package Client;
 
 import AllStoresServer.Interfaces.AllStoresServerInterface;
+import ZooKeeper.ZooKeeperConnector;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
@@ -11,10 +16,16 @@ import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class TrafficGeneratorPerformanceMonitoring {
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.data.Stat;
 
-	private static final String ALLSTORES_HOST = "127.0.0.1";
-	private static final int ALLSTORES_PORT = 1099;
+public class TrafficGeneratorPerformanceMonitoring {
+	private static ZooKeeperConnector zooKeeperConnector;
+
+	private static final String FILE_SEPARATOR = File.separator;
+	private static final String ZK_PATH = System.getProperty("user.home")
+			+ FILE_SEPARATOR + "AllstoresDB" + FILE_SEPARATOR;
+
 	private static final String ALLSTORES_REGISTRY_NAME = "ClientServerInterface";
 
 	private static final int ALLSTORES_MAX_SHOPID = 600;
@@ -23,6 +34,7 @@ public class TrafficGeneratorPerformanceMonitoring {
 
 	private static boolean stopThreads = false;
 	private static int elapsedTime;
+	private static Random randomApp;
 
 	private static class Options {
 		int numberClients;
@@ -45,13 +57,22 @@ public class TrafficGeneratorPerformanceMonitoring {
 		private final int clientID;
 		private final AllStoresServerInterface allStoresServer;
 		private ThreadResult result = new ThreadResult();
+		private String[] znodeData;
 
-		ClientThread(boolean writeMode, int singleStore, int clientID) throws RemoteException, NotBoundException {
+		ClientThread(boolean writeMode, int singleStore, int clientID) throws RemoteException, NotBoundException, IOException, InterruptedException {
 			this.writeMode = writeMode;
 			this.singleStore = singleStore;
 			this.clientID = clientID;
 
-			Registry registry = LocateRegistry.getRegistry(ALLSTORES_HOST, ALLSTORES_PORT);
+			String zooKeeperHost = getZooKeeperHost();
+			ZooKeeper zooKeeper = zooKeeperConnector.connect(zooKeeperHost);
+
+			// getting a random app server to connect
+			znodeData = findAppServer(zooKeeper);
+			String host = znodeData[0];
+			int port = Integer.parseInt(znodeData[1]);
+
+			Registry registry = LocateRegistry.getRegistry(host, port);
 			this.allStoresServer = (AllStoresServerInterface) registry.lookup(ALLSTORES_REGISTRY_NAME);
 		}
 
@@ -118,13 +139,14 @@ public class TrafficGeneratorPerformanceMonitoring {
 			e.printStackTrace();
 		} catch (NotBoundException e) {
 			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}catch (InterruptedException e) {
+			e.printStackTrace();
 		}
 	}
 
-	private void runClients(Options options) throws RemoteException, NotBoundException {
-		// ...
-		// todo inicializar X threads durante Y segundos (armar um alarme)
-
+	private void runClients(Options options) throws RemoteException, NotBoundException, InterruptedException, IOException {
 		List<ClientThread> threads = new ArrayList<>();
 		Random random = new Random();
 		int randomClientID;
@@ -204,7 +226,7 @@ public class TrafficGeneratorPerformanceMonitoring {
 
 	private void printFinalResults(List<ThreadResult> results) {
 		double totalNumberRequests = 0, completedRequests = 0, unavailableRequests = 0;
-		
+
 		for (ThreadResult tr : results) {
 			try {
 				tr.join();
@@ -266,6 +288,49 @@ public class TrafficGeneratorPerformanceMonitoring {
 				System.exit(0);
 			}
 		}
+		return result;
+	}
+
+	private static String[] findAppServer(ZooKeeper zooKeeper) {
+		randomApp = new Random();
+
+		try {
+			List<String> children = getNumberOfChildren(zooKeeper);
+
+			int child = randomApp.nextInt(children.size());
+			String znode = children.get(child);
+
+			byte[] bp = zooKeeper.getData(ZK_PATH.concat("app").concat(FILE_SEPARATOR).concat(znode), false, null);
+			String s = new String(bp);
+			String[] data = s.split(":");
+
+			if(data.length == 2)
+				return data;
+
+		} catch (Exception e) { System.out.println(e.getMessage()); }
+
+		return null;
+	}
+
+	private static List<String> getNumberOfChildren(ZooKeeper zooKeeper) {
+		try {
+			Stat stat = zooKeeper.exists(ZK_PATH.concat("app"), false);
+			if(stat != null) {
+				// fetch all children from /app
+				List<String> childrenList = zooKeeper.getChildren(ZK_PATH.concat("app"), false);
+				Collections.sort(childrenList);
+
+				return childrenList;
+			} else { System.out.println("Node does not exist."); } 
+		} catch (Exception e) { System.out.println(e.getMessage()); }
+
+		return null;
+	}
+
+	private static String getZooKeeperHost() throws IOException {
+		BufferedReader fileReader = new BufferedReader(new FileReader(ZK_PATH + "conf.cfg"));
+		String result = fileReader.readLine();
+		fileReader.close();
 		return result;
 	}
 }

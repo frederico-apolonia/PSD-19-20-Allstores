@@ -42,7 +42,7 @@ public class Server {
 		int basePort = Integer.parseInt(new String(zooKeeper.getData("/app", false, appStat)));
 		int port = basePort + zooKeeperId;
 		String host = InetAddress.getLocalHost().getHostAddress();
-
+		
 		// port must be lower than 15500 so it doesn't collide with DB
 		assert port < 15500;
 

@@ -22,11 +22,31 @@ public class Client {
 	private static ZooKeeperConnector zooKeeperConnector = new ZooKeeperConnector();
 
 	private static final String FILE_SEPARATOR = File.separator;
-	// property fetches the home path
 	private static final String ZK_PATH = System.getProperty("user.home")
 			+ FILE_SEPARATOR + "AllstoresDB" + FILE_SEPARATOR;
 
-	private static Random random;
+	private static Random randomApp;
+
+	private static String[] findAppServer(ZooKeeper zooKeeper) {
+		randomApp = new Random();
+
+		try {
+			List<String> children = getNumberOfChildren(zooKeeper);
+
+			int child = randomApp.nextInt(children.size());
+			String znode = children.get(child);
+
+			byte[] bp = zooKeeper.getData(ZK_PATH.concat("app").concat(FILE_SEPARATOR).concat(znode), false, null);
+			String s = new String(bp);
+			String[] data = s.split(":");
+
+			if(data.length == 2)
+				return data;
+
+		} catch (Exception e) { System.out.println(e.getMessage()); }
+
+		return null;
+	}
 
 	private static List<String> getNumberOfChildren(ZooKeeper zooKeeper) {
 		try {
@@ -45,11 +65,11 @@ public class Client {
 
 	private static String getAppServerPort(ZooKeeper zooKeeper) {
 		int port = 0;
+		Random random = new Random();
 
 		try {
 			List<String> children = getNumberOfChildren(zooKeeper);
 			assert children != null;
-
 			int child = random.nextInt(children.size());
 			String znode = children.get(child);
 
@@ -62,10 +82,10 @@ public class Client {
 
 	public static void main(String[] args) throws Exception {
 
-		random = new Random();
 		AllStoresServerInterface allStoresServer = null;
 		String randomAppServer, host;
 		int clientID, storeID, productID, quantity, port;
+		String[] znodeData;
 
 		try {
 

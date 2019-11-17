@@ -125,7 +125,7 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 	}
 
 	/*
-	 * Looks up and connects to the registry
+	 * Connects to DBServer given a znode data
 	 */
 	private IDataBase connectToDatabaseServer(String address) throws RemoteException, NotBoundException {
 
@@ -148,7 +148,7 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 		String databaseServer;
 		IDataBase connectionDB;
 		StringBuilder message = new StringBuilder();
-		
+
 		try {
 			databaseServer = findDatabaseServer(storeID);
 			connectionDB = connectToDatabaseServer(databaseServer);
