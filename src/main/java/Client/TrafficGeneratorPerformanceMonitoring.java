@@ -228,7 +228,7 @@ public class TrafficGeneratorPerformanceMonitoring {
 	}
 
 	private void printFinalResults(List<ThreadResult> results) {
-		double totalNumberRequests = 0, completedRequests = 0, unavailableRequests = 0;
+		int totalNumberRequests = 0, completedRequests = 0, unavailableRequests = 0;
 
 		for (ThreadResult tr : results) {
 			try {
@@ -243,10 +243,17 @@ public class TrafficGeneratorPerformanceMonitoring {
 
 		double fulfilledRate = ((totalNumberRequests - unavailableRequests) / totalNumberRequests);
 		double completionRate = ((totalNumberRequests - completedRequests) / totalNumberRequests);
-
+		double throughput = completedRequests / elapsedTime;
+		
 		System.out.println(String.format(
-				"Total number of sent requests: %f\nThe number of received replies: %f\nExecution time: %d seconds\nThroughput: %.2f op/s\nFulfilled rate: %.2f%\nCompletion rate: %.2f%",
-				totalNumberRequests, completedRequests, elapsedTime, (completedRequests / elapsedTime), fulfilledRate, completionRate));
+				"Finished\n" +
+						"Total number of sent requests: %d\n" +
+						"The number of received replies: %d\n" +
+						"Execution time: %d seconds\n" +
+						"Throughput: %.2f op/s\n" +
+						"Fulfilled rate: %.2f%%\n" +
+						"Completion rate: %.2f%%",
+				totalNumberRequests, completedRequests, elapsedTime, throughput, fulfilledRate, completionRate));
 		System.out.println("");
 		System.out.println("");
 	}
