@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.rmi.registry.LocateRegistry;
 import AllStoresServer.Interfaces.AllStoresServerInterface;
 import ZooKeeper.*;
@@ -13,6 +14,8 @@ import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
 
 import java.rmi.registry.Registry;
+import java.util.Enumeration;
+import java.util.Scanner;
 
 
 public class Server {
@@ -41,7 +44,7 @@ public class Server {
 		int zooKeeperId = Integer.parseInt(zooKeeperIdString.replaceFirst("^0+(?!$)", ""));
 		int basePort = Integer.parseInt(new String(zooKeeper.getData("/app", false, appStat)));
 		int port = basePort + zooKeeperId;
-		String host = InetAddress.getLocalHost().getHostAddress();
+		String host = getInetAddress();
 		
 		// port must be lower than 15500 so it doesn't collide with DB
 		assert port < 15500;
@@ -66,11 +69,48 @@ public class Server {
 		System.out.println(myID);
 	}
 
-	private static String getZooKeeperHost() throws IOException {
-		BufferedReader fileReader = new BufferedReader(new FileReader(ZK_PATH + "conf.cfg"));
-		String result = fileReader.readLine();
-		fileReader.close();
-		return result;
+	private static String getInetAddress() throws IOException {
+    	String networkInterface = getNetworkInterface();
+    	String result = InetAddress.getLocalHost().getHostAddress();
+    	
+    	Enumeration<NetworkInterface> n = NetworkInterface.getNetworkInterfaces();
+        for (; n.hasMoreElements();)
+        {
+                NetworkInterface e = n.nextElement();
+                if(e.getName().equals(networkInterface)) {
+                	Enumeration<InetAddress> addresses = e.getInetAddresses();
+                	addresses.nextElement();
+                	result = addresses.nextElement().getHostAddress();
+                }
+                System.out.println("Interface: " + e.getName());
+                Enumeration<InetAddress> a = e.getInetAddresses();
+                for (; a.hasMoreElements();)
+                {
+                        InetAddress addr = a.nextElement();
+                        System.out.println("  " + addr.getHostAddress());
+                }
+        }
+        
+        return result;
 	}
+
+	private static String getZooKeeperHost() throws IOException {
+        BufferedReader fileReader = new BufferedReader(new FileReader(ZK_PATH + "conf.cfg"));
+        String result = fileReader.readLine();
+        fileReader.close();
+        return result;
+    }
+    
+    private static String getNetworkInterface() throws IOException {
+    	// BufferedReader fileReader = new BufferedReader(new FileReader(ZK_PATH + "conf.cfg"));
+    	Scanner sc = new Scanner(new FileReader(ZK_PATH + "conf.cfg"));
+    	sc.nextLine();
+    	String result = null;
+    	if (sc.hasNext()) {
+    		result = sc.nextLine();
+    	}
+    	sc.close();
+    	return result;
+    }
 
 }
