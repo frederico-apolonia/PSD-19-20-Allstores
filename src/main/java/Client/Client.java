@@ -6,6 +6,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
@@ -19,13 +20,14 @@ import org.apache.zookeeper.data.Stat;
 
 public class Client {
 
+	private static final String ALLSTORES_REGISTRY_NAME = "ClientServerInterface";
 	private static ZooKeeperConnector zooKeeperConnector = new ZooKeeperConnector();
 
 	private static final String FILE_SEPARATOR = File.separator;
 	private static final String ZK_PATH = System.getProperty("user.home")
 			+ FILE_SEPARATOR + "AllstoresDB" + FILE_SEPARATOR;
 
-	private static List<String> getNumberOfChildren(ZooKeeper zooKeeper) {
+	private static List<String> getAppServerIds(ZooKeeper zooKeeper) {
 		try {
 			Stat stat = zooKeeper.exists("/app", false);
 			if(stat != null) {
@@ -40,11 +42,11 @@ public class Client {
 		return null;
 	}
 
-	private static String getAppServerPort(ZooKeeper zooKeeper) {
+	public static String getRandomAppServer(ZooKeeper zooKeeper) {
 		Random random = new Random();
 
 		try {
-			List<String> children = getNumberOfChildren(zooKeeper);
+			List<String> children = getAppServerIds(zooKeeper);
 			assert children != null;
 			int child = random.nextInt(children.size());
 			String znode = children.get(child);
@@ -56,11 +58,30 @@ public class Client {
 		return null;
 	}
 
+	/**
+	 * Connects to a appserver
+	 * @param appServer
+	 * @requires appServer != null
+	 * @return
+	 */
+	public static AllStoresServerInterface connectToAppServer(String appServer)
+			throws RemoteException, NotBoundException {
+
+		String[] appServerSplit = appServer.split(":");
+		assert appServerSplit.length == 2;
+		String host = appServerSplit[0];
+		int port = Integer.parseInt(appServerSplit[1]);
+
+		// getting the registry and looking up the registry for the remote object
+		Registry registry = LocateRegistry.getRegistry(host, port);
+		return (AllStoresServerInterface) registry.lookup(ALLSTORES_REGISTRY_NAME);
+	}
+
 	public static void main(String[] args) throws Exception {
 
-		AllStoresServerInterface allStoresServer = null;
-		String randomAppServer, host;
-		int clientID, storeID, productID, quantity, port;
+		AllStoresServerInterface allStoresServer;
+		String randomAppServer;
+		int clientID, storeID, productID, quantity;
 
 		try {
 
@@ -68,16 +89,9 @@ public class Client {
 			ZooKeeper zooKeeper = zooKeeperConnector.connect(zooKeeperHost);
 
 			// getting a random app server
-			randomAppServer = getAppServerPort(zooKeeper);
+			randomAppServer = getRandomAppServer(zooKeeper);
 			assert randomAppServer != null;
-			String[] appServerSplit = randomAppServer.split(":");
-			assert appServerSplit.length == 2;
-			host = appServerSplit[0];
-			port = Integer.parseInt(appServerSplit[1]);
-
-			// getting the registry and looking up the registry for the remote object
-			Registry registry = LocateRegistry.getRegistry(host, port);
-			allStoresServer = (AllStoresServerInterface) registry.lookup("ClientServerInterface");
+			allStoresServer = connectToAppServer(randomAppServer);
 
 			while(true) {
 				System.out.println("Welcome to Allstores, a place where you can buy products from 600 stores!\n"

@@ -26,8 +26,6 @@ public class TrafficGeneratorPerformanceMonitoring {
 	private static final String ZK_PATH = System.getProperty("user.home")
 			+ FILE_SEPARATOR + "AllstoresDB" + FILE_SEPARATOR;
 
-	private static final String ALLSTORES_REGISTRY_NAME = "ClientServerInterface";
-
 	private static final int ALLSTORES_MAX_SHOPID = 600;
 	private static final int ALLSTORES_MAX_PRODUCTID = 20;
 	private static final int BUY_RESERVE_QUANTITY = 1;
@@ -54,29 +52,20 @@ public class TrafficGeneratorPerformanceMonitoring {
 		private final boolean writeMode;
 		private final int singleStore;
 		private final int clientID;
-		private final AllStoresServerInterface allStoresServer;
+		private AllStoresServerInterface allStoresServer;
+		private ZooKeeper zooKeeper;
 		private ThreadResult result = new ThreadResult();
 		private String randomAppServer, host;
 		private int port;
 
-		ClientThread(boolean writeMode, int singleStore, int clientID) throws RemoteException, NotBoundException, IOException, InterruptedException {
+		ClientThread(boolean writeMode, int singleStore, int clientID) throws IOException, InterruptedException {
 			this.writeMode = writeMode;
 			this.singleStore = singleStore;
 			this.clientID = clientID;
 
+			// connect to ZooKeeper
 			String zooKeeperHost = getZooKeeperHost();
-			ZooKeeper zooKeeper = zooKeeperConnector.connect(zooKeeperHost);
-
-			// getting a random app server
-			randomAppServer = findAppServer(zooKeeper);
-			assert randomAppServer != null;
-			String[] appServerSplit = randomAppServer.split(":");
-			assert appServerSplit.length == 2;
-			host = appServerSplit[0];
-			port = Integer.parseInt(appServerSplit[1]);
-
-			Registry registry = LocateRegistry.getRegistry(host, port);
-			this.allStoresServer = (AllStoresServerInterface) registry.lookup(ALLSTORES_REGISTRY_NAME);
+			zooKeeper = zooKeeperConnector.connect(zooKeeperHost);
 		}
 
 		public ThreadResult getResult() {
@@ -92,6 +81,11 @@ public class TrafficGeneratorPerformanceMonitoring {
 			boolean randomStores = singleStore == -1;
 			try {
 				while (!stopThreads) {
+					// get random app server so that we're not always pinging the same one
+					randomAppServer = Client.getRandomAppServer(zooKeeper);
+					assert randomAppServer != null;
+					allStoresServer = Client.connectToAppServer(randomAppServer);
+
 					product = rnd.nextInt(ALLSTORES_MAX_PRODUCTID) + 1;
 					if (randomStores) {
 						// random store
@@ -99,6 +93,8 @@ public class TrafficGeneratorPerformanceMonitoring {
 					}
 					if (writeMode) {
 						start = System.currentTimeMillis();
+						Client.reserve(this.allStoresServer, this.clientID, store, product,
+								BUY_RESERVE_QUANTITY);
 						actionResult = Client.buy(this.allStoresServer, this.clientID, store, product,
 								BUY_RESERVE_QUANTITY);
 						end = System.currentTimeMillis();
@@ -106,6 +102,7 @@ public class TrafficGeneratorPerformanceMonitoring {
 						start = System.currentTimeMillis();
 						actionResult = Client.reserve(this.allStoresServer, this.clientID, store, product,
 								BUY_RESERVE_QUANTITY);
+						Client.cancel(this.allStoresServer, this.clientID);
 						end = System.currentTimeMillis();
 					}
 					this.result.actionCount++;
@@ -117,9 +114,10 @@ public class TrafficGeneratorPerformanceMonitoring {
 					if (actionResult.toLowerCase().contains("unavailable")) {
 						this.result.unavailableCount++;
 					}
+
 				}
 
-			} catch (RemoteException e) {
+			} catch (RemoteException | NotBoundException e) {
 				e.printStackTrace();
 			}
 		}
@@ -134,6 +132,7 @@ public class TrafficGeneratorPerformanceMonitoring {
 		Options options = readArguments(args);
 		System.out.println(String.format("Number of clients: %d\nWrite mode = %b\nStoreID = %d\nTraffic time = %d",
 				options.numberClients, options.writeMode, options.storeID, options.trafficTime));
+		System.out.println("Elapsed time; Throughput; Average latency; Fulfilled rate");
 
 		TrafficGeneratorPerformanceMonitoring tgpm = new TrafficGeneratorPerformanceMonitoring();
 		try {
@@ -220,10 +219,8 @@ public class TrafficGeneratorPerformanceMonitoring {
 
 		double fulfilledRate = ((totalNumberRequests - unavailableRequests) / completedRequests);
 		System.out.println(String.format(
-				"Elapsed time: %d seconds\nThroughput: %.2f op/s\nAverage latency: %.2f ms\nFulfilled rate: %.2f%%",
+				"ET: %d seconds T: %.2f op/s AL: %.2f ms FR: %.2f%%",
 				elapsedTime, (completedRequests / elapsedTime), (totalLatency / totalNumberRequests), fulfilledRate));
-		System.out.println("");
-		System.out.println("");
 
 	}
 
@@ -244,7 +241,8 @@ public class TrafficGeneratorPerformanceMonitoring {
 		double fulfilledRate = ((totalNumberRequests - unavailableRequests) / totalNumberRequests);
 		double completionRate = ((totalNumberRequests - completedRequests) / totalNumberRequests);
 		double throughput = completedRequests / elapsedTime;
-		
+
+		System.out.println("***************************************************");
 		System.out.println(String.format(
 				"Finished\n" +
 						"Total number of sent requests: %d\n" +
@@ -254,8 +252,6 @@ public class TrafficGeneratorPerformanceMonitoring {
 						"Fulfilled rate: %.2f%%\n" +
 						"Completion rate: %.2f%%",
 				totalNumberRequests, completedRequests, elapsedTime, throughput, fulfilledRate, completionRate));
-		System.out.println("");
-		System.out.println("");
 	}
 
 	/**
@@ -299,38 +295,6 @@ public class TrafficGeneratorPerformanceMonitoring {
 			}
 		}
 		return result;
-	}
-
-	private static String findAppServer(ZooKeeper zooKeeper) {
-		Random randomApp = new Random();
-
-		try {
-			List<String> children = getNumberOfChildren(zooKeeper);
-			assert children != null;
-			int child = randomApp.nextInt(children.size());
-			String znode = children.get(child);
-
-			byte[] bp = zooKeeper.getData("/app/".concat(znode), false, null);
-			return new String(bp);
-
-		} catch (Exception e) { System.out.println(e.getMessage()); }
-
-		return null;
-	}
-
-	private static List<String> getNumberOfChildren(ZooKeeper zooKeeper) {
-		try {
-			Stat stat = zooKeeper.exists("/app", false);
-			if(stat != null) {
-				// fetch all children from /app
-				List<String> childrenList = zooKeeper.getChildren("/app", false);
-				Collections.sort(childrenList);
-
-				return childrenList;
-			} else { System.out.println("Node does not exist."); } 
-		} catch (Exception e) { System.out.println(e.getMessage()); }
-
-		return null;
 	}
 
 	private static String getZooKeeperHost() throws IOException {
