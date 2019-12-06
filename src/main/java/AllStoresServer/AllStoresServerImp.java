@@ -160,7 +160,7 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 				// verify if there is enough quantity to reserve
 				if (product.getAvailable() >= quantity) {
 					// check if the client already has a current reservation for this product
-					Reservation reservation = connectionDB.findClientReservation(clientID, storeID, productID);
+					Reservation reservation = connectionDB.getClientReservation(clientID, storeID, productID);
 					if (reservation != null) {
 						int updateQuantity = reservation.getQuantity() + quantity;
 						if(connectionDB.updateClientReservation(reservation, updateQuantity)) {
@@ -206,6 +206,7 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 		try {
 			int dbServers = this.dbServers.size();
 			for (int i = 1; i <= dbServers; i++) {
+				// goes thru each database server and removes all reservations associated with this client
 				connectionDB = connectToDatabaseServer(this.dbServers.get(i));
 
 				assert connectionDB != null;
@@ -268,7 +269,7 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 			if(product != null) {
 				// verifica se o cliente já tem reservas desse produto e
 				// se tiver, verifica se é em menor ou maior quantidade da pretendida
-				Reservation reservedProduct = connectionDB.findClientReservation(clientID, storeID, productID);
+				Reservation reservedProduct = connectionDB.getClientReservation(clientID, storeID, productID);
 
 				// cliente tem reserva
 				if (reservedProduct != null) {

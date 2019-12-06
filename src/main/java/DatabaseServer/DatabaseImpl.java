@@ -398,34 +398,40 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         /* Reservations don't go to logs, they don't matter if the system goes down and back up again */
 
         // update product information to match this new reservation
-        if(!productUpdateReservation(reservation.getShopID(), reservation.getProductID(), reservation.getQuantity(), true)) {
+        Product product = getShopProduct(reservation.getShopID(), reservation.getProductID());
+        if(!product.reserve(reservation.getQuantity())) {
             return false;
         }
+
+        Reservation newReservation = new Reservation(
+                reservation.getClientID(),
+                reservation.getShopID(),
+                reservation.getProductID(),
+                reservation.getQuantity()
+        );
         //
-        List<Reservation> clientReservations = this.reservations.get(reservation.getClientID());
+        List<Reservation> clientReservations = this.reservations.get(newReservation.getClientID());
         if(clientReservations != null) {
-            clientReservations.add(reservation);
+            clientReservations.add(newReservation);
         } else {
             clientReservations = new ArrayList<>();
-            clientReservations.add(reservation);
-            this.reservations.put(reservation.getClientID(), clientReservations);
+            clientReservations.add(newReservation);
+            this.reservations.put(newReservation.getClientID(), clientReservations);
         }
         // arm the 15s clock
-        superviseReservation(reservation);
+        superviseReservation(newReservation);
 
         return true;
     }
 
-    public synchronized Reservation findClientReservation(int clientID, int shopID, int productID) {
-        Reservation r = getClientReservation(clientID, shopID, productID);
-        if (r != null) {
-            return new Reservation(r.getClientID(), r.getShopID(), r.getProductID(), r.getQuantity());
-        } else {
-            return null;
-        }
-    }
-
-    private Reservation getClientReservation(int clientID, int shopID, int productID) {
+    /**
+     * Get client reservation associated with a product
+     * @param clientID
+     * @param shopID
+     * @param productID
+     * @return Reservation if it has been placed, null if not
+     */
+    public Reservation getClientReservation(int clientID, int shopID, int productID) {
         Reservation result = null;
         List<Reservation> clientReservations = this.reservations.get(clientID);
         if (clientReservations != null) {
@@ -441,22 +447,24 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
     @Override
     public boolean updateClientReservation(Reservation reservation, int updateQuantity) throws RemoteException {
-        boolean result = false;
-        List<Reservation> clientReservations = this.reservations.get(reservation.getClientID());
-        if(clientReservations != null) {
-            for (Reservation r : clientReservations) {
-                if(reservation.equals(r)) {
-                    r.timer.cancel();
-                    r.timer.purge();
-                    int reserveQuantityIncrement = updateQuantity - r.getQuantity();
-                    r.setQuantity(updateQuantity);
-                    result = productUpdateReservation(r.getShopID(), r.getProductID(), reserveQuantityIncrement, true);
-                    superviseReservation(r);
-                }
-            }
-        }
+        // get reservation object
+        Reservation r = getClientReservation(reservation.getClientID(), reservation.getShopID(), reservation.getProductID());
+        // cancel reservation
+        r.timer.cancel();
+        r.timer.purge();
 
-        return result;
+        // update product quantity
+        int reserveQuantityIncrement = updateQuantity - r.getQuantity();
+        Product product = getShopProduct(r.getShopID(), r.getProductID());
+        if(product.reserve(reserveQuantityIncrement)) {
+            r.setQuantity(updateQuantity);
+            superviseReservation(r);
+            return true;
+        } else {
+            // if it fails, we need to completely remove this reservation
+            cancelReservation(r);
+            return false;
+        }
     }
 
     private void superviseReservation(Reservation reservation) {
@@ -467,7 +475,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
             @Override
             public void run() {
                 try {
-                    removeReservation(reservation);
+                    cancelReservation(reservation);
                 } catch (RemoteException e) {
                     e.printStackTrace();
                 }
@@ -481,16 +489,23 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         boolean result = false;
         // first, check if the client already has a reservation for this product
         Reservation existingReservation = getClientReservation(clientID, shopID, productID);
-        int remainingReservationQuantity = -1;
+        int remainingReservationQuantity = 0;
         if(existingReservation != null) {
             // if so, disarm the clock, subtract the qty, if > 0, arm the clock again, else remove it. save the
             // qty difference (reserve.qty - quantity)
             remainingReservationQuantity = existingReservation.getQuantity() - quantity;
-            result = removeReservation(existingReservation);
+            result = cancelReservation(existingReservation);
         }
 
+        Product product = getShopProduct(shopID, productID);
         // update the product information (reservation space is already taken care of)
-        updateBuyProduct(shopID, productID, quantity);
+        if(!product.sale(quantity)) {
+            // buy fails because there's no sufficient products for buy
+            if (existingReservation != null) {
+                addReservation(new Reservation(clientID, shopID, productID, existingReservation.getQuantity()));
+            }
+            return false;
+        }
         // write to log
         try {
             result = writeBuyToLog(shopID, productID, quantity);
@@ -504,6 +519,25 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
                result = addReservation(new Reservation(clientID, shopID, productID, remainingReservationQuantity));
            }
         }
+        return result;
+    }
+
+    /**
+     * Gets a product from a shop
+     * @param shopID
+     * @param productID
+     * @return Product if product exists, else null
+     */
+    private Product getShopProduct(int shopID, int productID) {
+        Product result = null;
+
+        for(Product p : this.shops.get(shopID)) {
+            if(p.getProductID() == productID) {
+                result = p;
+                break;
+            }
+        }
+
         return result;
     }
 
@@ -525,29 +559,34 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         }
     }
 
-    @Override
-    public synchronized boolean removeReservation(Reservation reservation) throws RemoteException {
-        int counter = 0;
-        List<Reservation> clientReservations = this.reservations.get(reservation.getClientID());
-        Reservation res = clientReservations.get(counter);
-
-        while(!reservation.equals(res)) {
-            counter++;
-            if(counter > clientReservations.size()) {
-                res = null;
-                break;
-            }
-            res = clientReservations.get(counter);
+    /**
+     * Removes (cancel) a reservation R (if it exists)
+     * @param reservation
+     * @return true if reservation was removed with success, false if it doesn't exist (or something happened)
+     * @throws RemoteException
+     */
+    private boolean cancelReservation(Reservation reservation) throws RemoteException {
+        if(reservation == null) {
+            return false;
         }
 
-        if(res != null) {
-            // cancel the timer
-            res.timer.cancel();
-            productUpdateReservation(res.getShopID(), res.getProductID(), res.getQuantity(), false);
-            clientReservations.remove(counter);
-            return true;
+        List<Reservation> clientReservations;
+
+        if((clientReservations = getClientReservations(reservation.getClientID())) == null) {
+            // check if client has reservations
+            return false;
         }
-        return false;
+
+        // remove reservation from reservation list
+        if(!clientReservations.remove(reservation)) {
+            return false;
+        }
+
+        // get product associated with this reservation
+        Product product = getShopProduct(reservation.getShopID(), reservation.getProductID());
+        // remove reservation placement
+        return product.removeReservation(reservation.getQuantity());
+
     }
 
     @Override
@@ -560,42 +599,22 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
             }
 
         }
-        return result;
-    }
-
-    @Override
-    public synchronized boolean productUpdateReservation
-            (int shopID, int productID, int reserveQuantity, boolean increaseReservation) throws RemoteException {
-
-        int result = -1;
-
-        for(Product p : this.shops.get(shopID)) {
-            if(p.getProductID() == productID) {
-                if(increaseReservation) {
-                    p.setAvailable(p.getAvailable() - reserveQuantity);
-                    p.setReserved(p.getReserved() + reserveQuantity);
-                    result = p.getAvailable();
-                } else {
-                    p.setAvailable(p.getAvailable() + reserveQuantity);
-                    p.setReserved(p.getReserved() - reserveQuantity);
-                    result = p.getAvailable();
-                }
-                break;
-            }
-        }
-        return result != -1;
+        return this.reservations.get(clientID);
     }
 
     @Override
     public synchronized boolean cancelAllReservations(int clientID) throws RemoteException {
 
         List<Reservation> clientReservations = this.reservations.get(clientID);
+        Product product;
 
         if(clientReservations != null) {
             for(Reservation r : clientReservations) {
-                // cancel all timers
+                // cancel timer
                 r.timer.cancel();
-                productUpdateReservation(r.getShopID(), r.getProductID(), r.getQuantity(), false);
+                // update product availability
+                product = getShopProduct(r.getShopID(), r.getProductID());
+                product.removeReservation(r.getQuantity());
             }
             this.reservations.remove(clientID);
             return true;

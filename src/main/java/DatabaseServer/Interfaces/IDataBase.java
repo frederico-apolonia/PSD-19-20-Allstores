@@ -17,14 +17,6 @@ public interface IDataBase extends Remote {
     public boolean addReservation(Reservation r) throws RemoteException;
 
     /**
-     * Removes a reservation R (if it exists)
-     * @param r reservation to be removed
-     * @return true if reservation was removed with success, false if it doesn't exist (or something happened)
-     * @throws RemoteException
-     */
-    public boolean removeReservation(Reservation r) throws RemoteException;
-
-    /**
      * Get all reservations from a client
      * @param clientID
      * @return List containing all reservations from a client
@@ -48,7 +40,7 @@ public interface IDataBase extends Remote {
      * @return Client reservation R if found, null if not found
      * @throws RemoteException
      */
-    public Reservation findClientReservation(int clientID, int shopID, int productID)throws RemoteException;
+    public Reservation getClientReservation(int clientID, int shopID, int productID)throws RemoteException;
 
     /**
      * Updates an existing client reservation
@@ -58,18 +50,6 @@ public interface IDataBase extends Remote {
      * @throws RemoteException
      */
     public boolean updateClientReservation(Reservation reservation, int updateQuantity) throws RemoteException;
-
-    /**
-     * Updates shop stock and reservation parameters
-     * @param shopID
-     * @param productID
-     * @param reserveQuantity
-     * @param increaseReservation if the reservation quantity should be increased (true) or decreased (false)
-     * @return true if everything went OK
-     * @throws RemoteException
-     */
-    public boolean productUpdateReservation(int shopID, int productID, int reserveQuantity, boolean increaseReservation)
-            throws RemoteException;
 
     /**
      * Lists all products of a shop

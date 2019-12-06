@@ -85,4 +85,46 @@ public class Product implements Serializable {
     public void setReserved(int reserved) {
         this.reserved = reserved;
     }
+
+    /**
+     * Update product availability after a sale has been make
+     * @param quantity
+     * @return
+     */
+    public boolean sale(int quantity) {
+        if(this.available - quantity < 0) {
+            return false;
+        }
+        this.available -= quantity;
+        this.sold += quantity;
+        return true;
+    }
+
+    /**
+     * Update product availability after a reservation has been make
+     * @param quantity
+     * @return
+     */
+    public boolean reserve(int quantity) {
+        if(this.available - quantity < 0) {
+            return false;
+        }
+        this.available -= quantity;
+        this.reserved += quantity;
+        return true;
+    }
+
+    /**
+     * Update product availability after a reservation has been canceled
+     * @param quantity
+     * @return
+     */
+    public boolean removeReservation(int quantity) {
+        if(quantity > this.reserved) {
+            return false;
+        }
+        this.reserved -= quantity;
+        this.available += quantity;
+        return true;
+    }
 }
