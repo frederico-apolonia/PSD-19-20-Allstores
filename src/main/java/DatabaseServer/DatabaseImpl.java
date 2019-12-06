@@ -67,7 +67,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
             File serverDir = new File(ALLSTORES_DB_PATH);
             // check if there is a previous version of the server
             System.out.println("Checking if there is a previous state of the database...");
-            if (Objects.requireNonNull(serverDir.listFiles(File::isDirectory)).length > 1) {
+            if (Objects.requireNonNull(serverDir.listFiles(File::isDirectory)).length > 2) {
                 System.out.println("Version found! Loading the latest saved state");
                 loadMultipleDBShops(serverDir);
             } else {
@@ -427,7 +427,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
      * @param productID
      * @return Reservation if it has been placed, null if not
      */
-    public Reservation getClientReservation(int clientID, int shopID, int productID) {
+    private Reservation getClientReservation(int clientID, int shopID, int productID) {
         Reservation result = null;
         List<Reservation> clientReservations = this.reservations.get(clientID);
         if (clientReservations != null) {
@@ -476,7 +476,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
                     e.printStackTrace();
                 }
             }
-        }, 15*1000);
+        }, 1000*1000);
     }
 
     @Override
@@ -568,7 +568,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
         List<Reservation> clientReservations;
 
-        if((clientReservations = getClientReservations(reservation.getClientID())) == null) {
+        if((clientReservations = this.reservations.get(reservation.getClientID())) == null) {
             // check if client has reservations
             return false;
         }
@@ -588,14 +588,16 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
     @Override
     public List<Reservation> getClientReservations(int clientID) throws RemoteException {
         List<Reservation> result = null;
+        System.out.println("Get client reservations....");
         if(this.reservations.containsKey(clientID)) {
+            System.out.println("Found client reservations");
             result = new ArrayList<>();
             for(Reservation r : this.reservations.get(clientID)) {
                 result.add(new Reservation(r.getClientID(), r.getShopID(), r.getProductID(), r.getQuantity()));
             }
 
         }
-        return this.reservations.get(clientID);
+        return result;
     }
 
     @Override
@@ -617,5 +619,15 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         }
 
         return false;
+    }
+
+    @Override
+    public Reservation findClientReservation(int clientID, int shopID, int productID) throws RemoteException {
+        Reservation r = getClientReservation(clientID, shopID, productID);
+        if(r != null) {
+            return new Reservation(r.getClientID(), r.getShopID(), r.getProductID(), r.getQuantity());
+        } else {
+            return null;
+        }
     }
 }

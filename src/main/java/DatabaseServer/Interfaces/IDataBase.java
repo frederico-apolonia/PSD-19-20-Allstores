@@ -40,7 +40,7 @@ public interface IDataBase extends Remote {
      * @return Client reservation R if found, null if not found
      * @throws RemoteException
      */
-    public Reservation getClientReservation(int clientID, int shopID, int productID)throws RemoteException;
+    public Reservation findClientReservation(int clientID, int shopID, int productID)throws RemoteException;
 
     /**
      * Updates an existing client reservation

@@ -47,7 +47,7 @@ public class DatabaseServer {
         int zooKeeperId = Integer.parseInt(zooKeeperIdString.replaceFirst("^0+(?!$)", ""));
         int basePort = Integer.parseInt(new String(zooKeeper.getData("/db", false, appStat)));
         int port = basePort + zooKeeperId;
-        String host = getInetAddress();
+        String host = readInetAddress();
         //String host = InetAddress.getLocalHost().getHostAddress();
 
         // port must be higher than 15500 so it doesn't collide with AllStoresApp
@@ -73,41 +73,28 @@ public class DatabaseServer {
         System.out.println(myID);
     }
 
-    private static String getInetAddress() throws IOException {
-    	String networkInterface = getNetworkInterface();
-    	String result = InetAddress.getLocalHost().getHostAddress();
-    	
-    	Enumeration<NetworkInterface> n = NetworkInterface.getNetworkInterfaces();
-        for (; n.hasMoreElements();)
-        {
-                NetworkInterface e = n.nextElement();
-                if(e.getName().equals(networkInterface)) {
-                	Enumeration<InetAddress> addresses = e.getInetAddresses();
-                	addresses.nextElement();
-                	result = addresses.nextElement().getHostAddress();
-                }
-        }
-        
-        return result;
-	}
-
 	private static String getZooKeeperHost() throws IOException {
         BufferedReader fileReader = new BufferedReader(new FileReader(ZK_PATH + "conf.cfg"));
         String result = fileReader.readLine();
         fileReader.close();
         return result;
     }
-    
-    private static String getNetworkInterface() throws IOException {
-    	// BufferedReader fileReader = new BufferedReader(new FileReader(ZK_PATH + "conf.cfg"));
-    	Scanner sc = new Scanner(new FileReader(ZK_PATH + "conf.cfg"));
-    	sc.nextLine();
-    	String result = null;
-    	if (sc.hasNext()) {
-    		result = sc.nextLine();
-    	}
-    	sc.close();
-    	return result;
+
+    /**
+     * Read inet address from config file. It must be on the second line. If the file doesn't contain
+     * a second line then it will return 127.0.0.1 as the inet server.
+     * @return inet address
+     * @throws IOException
+     */
+    private static String readInetAddress() throws IOException {
+        Scanner sc = new Scanner(new FileReader(ZK_PATH + "conf.cfg"));
+        sc.nextLine();
+        String result = "127.0.0.1";
+        if (sc.hasNext()) {
+            result = sc.nextLine();
+        }
+        sc.close();
+        return result;
     }
 
 }

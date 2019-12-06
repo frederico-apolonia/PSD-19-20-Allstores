@@ -10,6 +10,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
@@ -139,7 +140,9 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 			Registry registry = LocateRegistry.getRegistry(databaseHost, databasePort);
 			return (IDataBase) registry.lookup("AllstoresDatabaseServer");
 
-		} catch (Exception e) { System.out.println(e.getMessage()); }
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 
 		return null;
 	}
@@ -160,7 +163,7 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 				// verify if there is enough quantity to reserve
 				if (product.getAvailable() >= quantity) {
 					// check if the client already has a current reservation for this product
-					Reservation reservation = connectionDB.getClientReservation(clientID, storeID, productID);
+					Reservation reservation = connectionDB.findClientReservation(clientID, storeID, productID);
 					if (reservation != null) {
 						int updateQuantity = reservation.getQuantity() + quantity;
 						if(connectionDB.updateClientReservation(reservation, updateQuantity)) {
@@ -204,10 +207,10 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 		List<String> returnReserves = new ArrayList<>();
 
 		try {
-			int dbServers = this.dbServers.size();
-			for (int i = 1; i <= dbServers; i++) {
+			List<Integer> dbServersKeys = new ArrayList<>(this.dbServers.keySet());
+			for (int i = 0; i < dbServersKeys.size(); i++) {
 				// goes thru each database server and removes all reservations associated with this client
-				connectionDB = connectToDatabaseServer(this.dbServers.get(i));
+				connectionDB = connectToDatabaseServer(this.dbServers.get(dbServersKeys.get(i)));
 
 				assert connectionDB != null;
 				List<Reservation> clientReservations = connectionDB.getClientReservations(clientID);
@@ -269,7 +272,7 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 			if(product != null) {
 				// verifica se o cliente já tem reservas desse produto e
 				// se tiver, verifica se é em menor ou maior quantidade da pretendida
-				Reservation reservedProduct = connectionDB.getClientReservation(clientID, storeID, productID);
+				Reservation reservedProduct = connectionDB.findClientReservation(clientID, storeID, productID);
 
 				// cliente tem reserva
 				if (reservedProduct != null) {
