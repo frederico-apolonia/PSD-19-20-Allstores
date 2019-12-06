@@ -8,8 +8,11 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
+import java.util.Enumeration;
+import java.util.Scanner;
 
 // import zookeeper classes
 import org.apache.zookeeper.*;
@@ -44,7 +47,8 @@ public class DatabaseServer {
         int zooKeeperId = Integer.parseInt(zooKeeperIdString.replaceFirst("^0+(?!$)", ""));
         int basePort = Integer.parseInt(new String(zooKeeper.getData("/db", false, appStat)));
         int port = basePort + zooKeeperId;
-        String host = InetAddress.getLocalHost().getHostAddress();
+        String host = getInetAddress();
+        //String host = InetAddress.getLocalHost().getHostAddress();
 
         // port must be higher than 15500 so it doesn't collide with AllStoresApp
         assert port > 15500;
@@ -69,11 +73,41 @@ public class DatabaseServer {
         System.out.println(myID);
     }
 
-    private static String getZooKeeperHost() throws IOException {
+    private static String getInetAddress() throws IOException {
+    	String networkInterface = getNetworkInterface();
+    	String result = InetAddress.getLocalHost().getHostAddress();
+    	
+    	Enumeration<NetworkInterface> n = NetworkInterface.getNetworkInterfaces();
+        for (; n.hasMoreElements();)
+        {
+                NetworkInterface e = n.nextElement();
+                if(e.getName().equals(networkInterface)) {
+                	Enumeration<InetAddress> addresses = e.getInetAddresses();
+                	addresses.nextElement();
+                	result = addresses.nextElement().getHostAddress();
+                }
+        }
+        
+        return result;
+	}
+
+	private static String getZooKeeperHost() throws IOException {
         BufferedReader fileReader = new BufferedReader(new FileReader(ZK_PATH + "conf.cfg"));
         String result = fileReader.readLine();
         fileReader.close();
         return result;
+    }
+    
+    private static String getNetworkInterface() throws IOException {
+    	// BufferedReader fileReader = new BufferedReader(new FileReader(ZK_PATH + "conf.cfg"));
+    	Scanner sc = new Scanner(new FileReader(ZK_PATH + "conf.cfg"));
+    	sc.nextLine();
+    	String result = null;
+    	if (sc.hasNext()) {
+    		result = sc.nextLine();
+    	}
+    	sc.close();
+    	return result;
     }
 
 }
