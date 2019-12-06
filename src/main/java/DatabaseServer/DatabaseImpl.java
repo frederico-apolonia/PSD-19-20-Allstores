@@ -373,15 +373,11 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
                     fileWriter = new FileWriter(this.logPath, false);
                     // guarantee that it is now empty
                     fileWriter.write("");
-                } else {
-                    fileWriter = new FileWriter(this.logPath, true);
+                    fileWriter.close();
                 }
-            } else {
-                fileWriter = new FileWriter(logPath);
             }
-            fileWriter.append(String.format("%d %d %d\n", shopID, productID, quantity));
-            fileWriter.flush();
-            fileWriter.close();
+            LogWriter logWriter = new LogWriter(this.logPath, shopID, productID, quantity);
+            logWriter.start();
         } catch (IOException e) {
             return false;
         }
