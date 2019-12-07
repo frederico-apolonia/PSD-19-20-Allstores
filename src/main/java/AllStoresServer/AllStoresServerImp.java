@@ -53,16 +53,14 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 			byte[] zNodeData;
 			String serverHost;
 			int serverId;
+			this.dbServers = new HashMap<>();
 			for (String dbServer: dbServerNames) {
 				serverId = Integer.parseInt(dbServer.replaceFirst("^0+(?!$)", ""));
-				if (!this.dbServers.containsKey(serverId)) {
-					String dbServerPath = "/db/clients/".concat(dbServer);
-					currDb = this.zooKeeper.exists(dbServerPath, false);
-					zNodeData = this.zooKeeper.getData(dbServerPath, false, currDb);
-					serverHost = new String(zNodeData);
-
-					this.dbServers.put(serverId, serverHost);
-				}
+				String dbServerPath = "/db/clients/".concat(dbServer);
+				currDb = this.zooKeeper.exists(dbServerPath, false);
+				zNodeData = this.zooKeeper.getData(dbServerPath, false, currDb);
+				serverHost = new String(zNodeData);
+				this.dbServers.put(serverId, serverHost);
 			}
 			System.out.println("Detected database servers:");
 			for (int i: this.dbServers.keySet()) {
@@ -81,11 +79,10 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 			if (watchedEvent.getType() == Watcher.Event.EventType.NodeChildrenChanged) {
 				assert watchedEvent.getPath().equals("/db/clients");
 				try {
-					Thread.sleep(250);
+					Thread.sleep(500);
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
-				// todo doesn't account for when number of server dbs goes down!
 				fetchDbServers();
 
 				try {
@@ -115,7 +112,7 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 					result = this.dbServers.get(keyset.get(i));
 					found = true;
 				} else {
-					inf += sup;
+					inf = sup + 1;
 					sup += NUMBER_OF_STORES / numberServers;
 				}
 			}
@@ -196,8 +193,9 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 		} catch (Exception e) {
 			System.err.println("Something happened while exchanging messages with the DB Server!");
 			e.printStackTrace();
+			message.append("error");
 		}
-		return message.append("Server is Down.").toString();
+		return message.toString();
 	}
 
 
@@ -214,6 +212,9 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 
 				assert connectionDB != null;
 				List<Reservation> clientReservations = connectionDB.getClientReservations(clientID);
+				if(clientReservations == null) {
+					continue;
+				}
 
 				if(clientReservations.size() != 0) {
 					for (Reservation r : clientReservations) {
@@ -223,6 +224,8 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 					result = connectionDB.cancelAllReservations(clientID);
 				}
 			} 
+		} catch (NullPointerException e) {
+			returnReserves.add("Error");
 		} catch (Exception e) {
 			System.err.println("Error while connecting to Database Server");
 			e.printStackTrace();
@@ -368,10 +371,10 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 			}
 			return soldList;
 		} catch (Exception e) {
-			System.err.println("Erro na conexão entre o ServerInTheMiddle e a BD!");
+			System.err.println("Error na conexão entre o ServerInTheMiddle e a BD!");
 			e.printStackTrace();
 		}
-
-		return null;
+		soldList.add("error");
+		return soldList;
 	}
 }

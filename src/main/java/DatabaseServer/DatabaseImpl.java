@@ -11,8 +11,7 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.logging.*;
 
 public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
@@ -43,6 +42,11 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
     private int lastShop;
 
     public DatabaseImpl(ZooKeeper zooKeeper, int zooKeeperId) throws Exception {
+        StreamHandler sh = new StreamHandler(System.out, new SimpleFormatter());
+        sh.setLevel(Level.FINER);
+        LOGGER.addHandler(sh);
+        LOGGER.setLevel(Level.ALL);
+
         this.zooKeeper = zooKeeper;
         this.zooKeeperId = zooKeeperId;
         this.serverPath = ALLSTORES_DB_PATH + zooKeeperId + FILE_SEPARATOR;
@@ -99,7 +103,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
             File serverDir = new File(ALLSTORES_DB_PATH);
             // check if there is a previous version of the server
             LOGGER.log(Level.FINE, "Checking if there is a previous state of the database...");
-            if (Objects.requireNonNull(serverDir.listFiles(File::isDirectory)).length > 1) {
+            if (Objects.requireNonNull(serverDir.listFiles(File::isDirectory)).length > 0) {
                 LOGGER.log(Level.FINE, "Version found! Loading the latest saved state");
                 loadMultipleDBShops(serverDir);
             } else {
@@ -187,7 +191,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
             }
             myPosition++;
         }
-        LOGGER.log(Level.FINER, String.format("This server position is %d of %d servers", myPosition, this.dbServers.size()));
+        LOGGER.log(Level.FINER, String.format("This server position is %d of %d servers", myPosition + 1, this.dbServers.size()));
 
         int shopsPerServer = NUMBER_OF_SHOPS / this.dbServers.size();
         LOGGER.log(Level.FINER, String.format("Number of servers:%d -> number of shops per server: %d",
@@ -428,8 +432,8 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         try {
             if(logFile.exists()) {
                 double fileSize = logFile.length();
-                // if file size is larger than 1000000 bytes (1MB) then it's time to write the stores to disk
-                if(fileSize > 1000000) {
+                // if file size is larger than 100000 bytes (100KB) then it's time to write the stores to disk
+                if(fileSize > 100000) {
                     writeStoresToDisk(this.shops, this.serverPath);
                     fileWriter = new FileWriter(this.logPath, false);
                     // guarantee that it is now empty
@@ -812,7 +816,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
     }
 
     @Override
-    public void updateDatabase(HashMap<Integer, List<Product>> shops) {
+    public synchronized void updateDatabase(HashMap<Integer, List<Product>> shops) {
         LOGGER.log(Level.FINE, String.format("Received a HashMap with %d shops", shops.size()));
         this.shops.putAll(shops);
         try {

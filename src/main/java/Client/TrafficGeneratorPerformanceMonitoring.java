@@ -155,7 +155,7 @@ public class TrafficGeneratorPerformanceMonitoring {
 
 		// initialize threads
 		for (int i = 0; i < options.numberClients; i++) {
-			randomClientID = random.nextInt();
+			randomClientID = random.nextInt() & Integer.MAX_VALUE;
 			threads.add(i, new ClientThread(options.writeMode, options.storeID, randomClientID));
 		}
 
