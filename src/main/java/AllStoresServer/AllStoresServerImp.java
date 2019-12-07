@@ -128,7 +128,7 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 	/*
 	 * Connects to DBServer given a znode data
 	 */
-	private IDataBase connectToDatabaseServer(String address) throws RemoteException, NotBoundException {
+	private IDataBase connectToDatabaseServer(String address) {
 
 		try {
 			String[] data = address.split(":");

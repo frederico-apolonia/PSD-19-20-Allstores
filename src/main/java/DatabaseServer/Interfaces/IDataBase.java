@@ -5,6 +5,7 @@ import DatabaseServer.Reservation;
 
 import java.rmi.Remote;
 import java.rmi.RemoteException;
+import java.util.HashMap;
 import java.util.List;
 
 public interface IDataBase extends Remote {
@@ -69,4 +70,19 @@ public interface IDataBase extends Remote {
      * @throws RemoteException
      */
     public boolean buyProduct(int shopID, int productID, int quantity, int clientID) throws RemoteException;
+
+    /**
+     *
+     * @param storeID
+     * @param productID
+     * @param quantity
+     * @return
+     */
+    boolean sendBuyToReplica(int shopID, int productID, int quantity) throws RemoteException;
+
+    /**
+     *
+     * @param shops
+     */
+    void updateDatabase(HashMap<Integer, List<Product>> shops) throws RemoteException;
 }
