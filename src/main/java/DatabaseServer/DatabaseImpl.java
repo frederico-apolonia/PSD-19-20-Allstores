@@ -1,6 +1,7 @@
 package DatabaseServer;
 
 import DatabaseServer.Interfaces.IDataBase;
+import org.apache.log4j.pattern.LogEvent;
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.data.Stat;
 
@@ -298,7 +299,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         assert directories != null;
 
         if (directories.length != 0) {
-
+            LOGGER.log(Level.FINE, "Picking a previous server ran on this machine to load the state...");
             // each directory is a previous run of a server shard
             for (File directory : directories) {
                 if (!directory.getName().equals("shared")) {
@@ -320,6 +321,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
      */
     private void loadShops(File directory) throws IOException {
         File[] shops = directory.listFiles();
+        LOGGER.log(Level.FINE, String.format("Loading stores from %s", directory));
         if (shops != null) {
             // go tru each SHOP FILE and create a new shop with their items
             for(File shop : shops) {
@@ -327,6 +329,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
                     String shopFile = shop.getName();
                     String[] shopFileSplit = shopFile.split(".shop");
                     int shopID = Integer.parseInt(shopFileSplit[0]);
+                    LOGGER.log(Level.FINER, String.format("Loading shop %d", shopID));
                     BufferedReader fileReader = new BufferedReader(new FileReader(shop));
                     List<Product> shopProducts = new ArrayList<>();
 
@@ -336,17 +339,21 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
                         int productID = Integer.parseInt(shopQuantities[0]);
                         int available = Integer.parseInt(shopQuantities[1]);
                         int sold = Integer.parseInt(shopQuantities[2]);
-
+                        LOGGER.log(Level.FINEST, String.format("Adding product %d, available %d, sold %d",
+                                productID, available, sold));
                         shopProducts.add(new Product(shopID, productID, available, sold));
                     }
                     fileReader.close();
                     this.shops.put(shopID, shopProducts);
+                    LOGGER.log(Level.FINER, String.format("Shop %d complete", shopID));
                 }
             }
+            LOGGER.log(Level.FINER, "Deleting previous shop files...");
             for (int i = shops.length - 1; i >= 0; i--) {
                 if(!shops[i].getName().contains("sales.log"))
                     shops[i].delete();
             }
+            LOGGER.log(Level.FINER, "Complete! Previous shop files deleted!");
         }
     }
 
@@ -354,6 +361,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
      * Updates files from logs
      */
     private void updateProductsFromLogs(File logFile) throws IOException {
+        LOGGER.log(Level.FINE, "Updating current shops from a previous log file");
         BufferedReader fileReader = new BufferedReader(new FileReader(logFile));
         String line = fileReader.readLine();
         while(line != null) {
@@ -361,11 +369,13 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
             int shopID = Integer.parseInt(productDetails[0]);
             int productID = Integer.parseInt(productDetails[1]);
             int quantity = Integer.parseInt(productDetails[2]);
-
+            LOGGER.log(Level.FINER, String.format("Updating product %d from shop %d with buy quantity %d",
+                    productID, shopID, quantity));
             updateBuyProduct(shopID, productID, quantity);
             line = fileReader.readLine();
         }
         fileReader.close();
+        LOGGER.log(Level.FINE, "Done, all shops updated from logger");
     }
 
     private void generateNewShop(int shopID) {
@@ -408,7 +418,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         }
         writer.flush();
         writer.close();
-        LOGGER.log(Level.FINER, String.format(String.format("Complete! Wrote shop %d to disk", shopID)));
+        LOGGER.log(Level.FINER, String.format("Complete! Wrote shop %d to disk", shopID));
     }
 
     private boolean writeBuyToLog(int shopID, int productID, int quantity) throws IOException {
@@ -437,19 +447,31 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
     @Override
     public synchronized List<Product> getShopProducts(int shopID) throws RemoteException {
+        LOGGER.log(Level.FINER, String.format("Request to get all products for shop %d", shopID));
+        if(shopID > this.lastShop || shopID < this.firstShop) {
+            LOGGER.log(Level.WARNING, String.format("Received a request to get a shop that is out of bounds!\n" +
+                    "Requested shop: %d; Min shop: %d; Max shop: %d", shopID, this.firstShop, this.lastShop));
+            return null;
+        }
         return shops.get(shopID);
     }
 
     @Override
     public synchronized boolean addReservation(Reservation reservation) throws RemoteException {
         /* Reservations don't go to logs, they don't matter if the system goes down and back up again */
+        LOGGER.log(Level.FINER, "Received a request to add a new reservation");
+        LOGGER.log(Level.FINER, String.format("Reservation contents:\nCID: %d; SID: %d; PID: %d; Qty: %d",
+                reservation.getClientID(), reservation.getShopID(), reservation.getProductID(), reservation.getQuantity()));
 
         // update product information to match this new reservation
+        LOGGER.log(Level.FINEST, "Getting product");
         Product product = getShopProduct(reservation.getShopID(), reservation.getProductID());
+        LOGGER.log(Level.FINEST, "Updating product to reserve the items");
         if(!product.reserve(reservation.getQuantity())) {
+            LOGGER.log(Level.WARNING, "Received a request to reserve with a larger quantity than available");
             return false;
         }
-
+        LOGGER.log(Level.FINEST, "Product updated! Creating the new reservation...");
         Reservation newReservation = new Reservation(
                 reservation.getClientID(),
                 reservation.getShopID(),
@@ -457,17 +479,24 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
                 reservation.getQuantity()
         );
         //
+        LOGGER.log(Level.FINEST, String.format("Finding if client %d already had reservations",
+                reservation.getClientID()));
         List<Reservation> clientReservations = this.reservations.get(newReservation.getClientID());
         if(clientReservations != null) {
+            LOGGER.log(Level.FINEST, "Client already has reservations, adding a new one");
             clientReservations.add(newReservation);
         } else {
+            LOGGER.log(Level.FINEST, "Client doesn't have existing reservations. Creating a new list");
             clientReservations = new ArrayList<>();
+            LOGGER.log(Level.FINEST, "Adding the reservation to the new list");
             clientReservations.add(newReservation);
+            LOGGER.log(Level.FINEST, "Adding reservation list to reservations map.");
             this.reservations.put(newReservation.getClientID(), clientReservations);
         }
+        LOGGER.log(Level.FINEST,"Reservation added, arming the alarm...");
         // arm the 15s clock
         superviseReservation(newReservation);
-
+        LOGGER.log(Level.FINEST, "Clock armed! Add reservation complete");
         return true;
     }
 
@@ -494,20 +523,27 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
     @Override
     public boolean updateClientReservation(Reservation reservation, int updateQuantity) throws RemoteException {
+        LOGGER.log(Level.FINER, String.format("Received a request to update a previous client reservation with new quantity %d",
+                updateQuantity));
         // get reservation object
         Reservation r = getClientReservation(reservation.getClientID(), reservation.getShopID(), reservation.getProductID());
+        LOGGER.log(Level.FINER, "Canceling previous reservation timer");
         // cancel reservation
         r.timer.cancel();
         r.timer.purge();
 
         // update product quantity
+        LOGGER.log(Level.FINER, "Updating reservation quantity on product");
         int reserveQuantityIncrement = updateQuantity - r.getQuantity();
         Product product = getShopProduct(r.getShopID(), r.getProductID());
         if(product.reserve(reserveQuantityIncrement)) {
             r.setQuantity(updateQuantity);
+            LOGGER.log(Level.FINER, "Reservation updated successfully, setting the new timer");
             superviseReservation(r);
             return true;
         } else {
+            LOGGER.log(Level.WARNING, "Update reservation failed! Received more quantity than available" +
+                    "Removing the reservation.");
             // if it fails, we need to completely remove this reservation
             cancelReservation(r);
             return false;
@@ -515,60 +551,88 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
     }
 
     private void superviseReservation(Reservation reservation) {
+        LOGGER.log(Level.FINER, String.format("Setting a new timer for reservation of CID %d and PID %d",
+                reservation.getClientID(), reservation.getProductID()));
         Timer timer = new Timer();
         reservation.timer = timer;
         // set a schedule to remove the reservation in 15 seconds
         reservation.timer.schedule(new TimerTask() {
             @Override
             public void run() {
+                LOGGER.log(Level.FINEST, String.format("Reservation CID %d and PID %d with quantity %d expired!\nUpdating product",
+                        reservation.getClientID(), reservation.getProductID(), reservation.getQuantity()));
                 try {
                     cancelReservation(reservation);
                 } catch (RemoteException e) {
+                    LOGGER.log(Level.WARNING, "Something happened while removing a reservation!");
                     e.printStackTrace();
                 }
+                LOGGER.log(Level.FINEST, "Reservation successfully canceled!");
             }
         }, 1000*1000);
     }
 
     @Override
     public synchronized boolean buyProduct(int shopID, int productID, int quantity, int clientID) throws RemoteException {
-
+        if(shopID > this.lastShop || shopID < this.firstShop) {
+            LOGGER.log(Level.WARNING, String.format("Received a request to buy a product from a shop that is out of bounds!\n" +
+                    "Requested shop: %d; Min shop: %d; Max shop: %d", shopID, this.firstShop, this.lastShop));
+            return false;
+        }
         boolean result = false;
         // first, check if the client already has a reservation for this product
+        LOGGER.log(Level.FINEST, String.format("Received a request to buy a PID %d of SID %d with qty %d from CID %d",
+                productID, shopID, quantity, clientID));
+        LOGGER.log(Level.FINEST, "Checking if client has an existing reservation for this product");
         Reservation existingReservation = getClientReservation(clientID, shopID, productID);
         int remainingReservationQuantity = 0;
         if(existingReservation != null) {
+            LOGGER.log(Level.FINEST, "Reservation found, disarming the clock");
             // if so, disarm the clock, subtract the qty, if > 0, arm the clock again, else remove it. save the
             // qty difference (reserve.qty - quantity)
+            existingReservation.timer.cancel();
+            existingReservation.timer.purge();
+
             remainingReservationQuantity = existingReservation.getQuantity() - quantity;
+            LOGGER.log(Level.FINEST, String.format("Reservation clock canceled. Remaining quantity for this reservation: %d",
+                    remainingReservationQuantity));
             result = cancelReservation(existingReservation);
         }
 
         Product product = getShopProduct(shopID, productID);
         // update the product information (reservation space is already taken care of)
+        LOGGER.log(Level.FINEST,"Updating product information (updating the available and sold values)");
         if(!product.sale(quantity)) {
             // buy fails because there's no sufficient products for buy
+            LOGGER.log(Level.WARNING, "Received a request to buy a product that doesn't contain the required amount of quantity!");
+            LOGGER.log(Level.WARNING, String.format("Available quantity: %d Requested %d", product.getAvailable(), quantity));
             if (existingReservation != null) {
+                LOGGER.log(Level.FINEST, "Updating reservation");
                 addReservation(new Reservation(clientID, shopID, productID, existingReservation.getQuantity()));
             }
             return false;
         }
         // write to log
+        LOGGER.log(Level.FINEST, String.format("Writing buy to log: SID %d PID %d Qty %d", shopID, productID, quantity));
         try {
             result = writeBuyToLog(shopID, productID, quantity);
         } catch (IOException e) {
-            // todo
+            LOGGER.log(Level.WARNING, "ERROR while writing buy to log! Proceeding...");
             e.printStackTrace();
         }
+        LOGGER.log(Level.FINEST, "Successfully wrote buy to log");
         // check if a new reservation should be added (if client had a previous reservation and didn't buy everything)
         if (existingReservation != null) {
            if(remainingReservationQuantity > 0) {
+                LOGGER.log(Level.FINEST, String.format("Adding a new reservation for the remaining quantity %d",
+                        remainingReservationQuantity));
                result = addReservation(new Reservation(clientID, shopID, productID, remainingReservationQuantity));
            }
         }
-
+        LOGGER.log(Level.FINEST, "Sending buy to replicas");
         sendBuyToAllReplicas(shopID, productID, quantity);
 
+        LOGGER.log(Level.FINEST, "Purchase complete!");
         return result;
     }
 
@@ -579,14 +643,20 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
      * @param quantity
      */
     private void sendBuyToAllReplicas(int shopID, int productID, int quantity) {
+        LOGGER.log(Level.FINEST, String.format("Sending buy SID %d PID %d QTY %d to all %d replicas",
+                shopID, productID, quantity, this.dbServers.size() - 1));
         for (String dbKey: this.dbServers.keySet()) {
             if(Integer.parseInt(dbKey.replaceFirst("^0+(?!$)", "")) != this.zooKeeperId) {
                 try {
+                    LOGGER.log(Level.FINEST, String.format("Sending to db %s", dbKey));
                     IDataBase replica = connectToDatabaseServer(this.dbServers.get(dbKey));
                     assert replica != null;
 
                     replica.sendBuyToReplica(shopID, productID, quantity);
+                    LOGGER.log(Level.FINEST, "Sent!");
                 } catch (RemoteException e) {
+                    LOGGER.log(Level.WARNING, String.format("ERROR while sending buy SID %d PID %d QTY %d to replica %s",
+                            shopID, productID, quantity, dbKey));
                     e.printStackTrace();
                 }
             }
@@ -633,68 +703,91 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         if(reservation == null) {
             return false;
         }
-
+        LOGGER.log(Level.FINEST, String.format("Removing reservation CID %d, PID %d",
+                reservation.getClientID(), reservation.getProductID()));
         List<Reservation> clientReservations;
 
         if((clientReservations = this.reservations.get(reservation.getClientID())) == null) {
+            LOGGER.log(Level.WARNING, String.format("Request to remove a reservation that doesn't exist! PID %d CID %d",
+                    reservation.getProductID(), reservation.getClientID()));
             // check if client has reservations
             return false;
         }
 
+        LOGGER.log(Level.FINEST, "Client has reservation in place");
         // remove reservation from reservation list
         if(!clientReservations.remove(reservation)) {
+            LOGGER.log(Level.WARNING, String.format("Request to remove a reservation that doesn't exist! PID %d CID %d",
+                    reservation.getProductID(), reservation.getClientID()));
             return false;
         }
 
         // get product associated with this reservation
         Product product = getShopProduct(reservation.getShopID(), reservation.getProductID());
         // remove reservation placement
+        LOGGER.log(Level.FINEST, "Updating product info and returning");
         return product.removeReservation(reservation.getQuantity());
 
     }
 
     @Override
     public List<Reservation> getClientReservations(int clientID) throws RemoteException {
+        LOGGER.log(Level.FINER, String.format("Request for all client %d reservations", clientID));
         List<Reservation> result = null;
-        System.out.println("Get client reservations....");
         if(this.reservations.containsKey(clientID)) {
-            System.out.println("Found client reservations");
+            LOGGER.log(Level.FINER, String.format("Found reservations for client %d", clientID));
+            LOGGER.log(Level.FINER, "Copying reservations to an ArrayList...");
             result = new ArrayList<>();
             for(Reservation r : this.reservations.get(clientID)) {
+                LOGGER.log(Level.FINEST, String.format("Copying reservation for shop %d, product %d and quantity %d",
+                        r.getShopID(), r.getProductID(), r.getQuantity()));
                 result.add(new Reservation(r.getClientID(), r.getShopID(), r.getProductID(), r.getQuantity()));
             }
 
         }
+        LOGGER.log(Level.FINER, String.format("Complete! Found %d reservations for client %d",
+                result == null ? 0 : result.size() ,clientID));
         return result;
     }
 
     @Override
     public synchronized boolean cancelAllReservations(int clientID) throws RemoteException {
-
+        LOGGER.log(Level.FINER, String.format("Request to cancel all reservations associated with client %d", clientID));
         List<Reservation> clientReservations = this.reservations.get(clientID);
         Product product;
 
         if(clientReservations != null) {
+            LOGGER.log(Level.FINER, "Reservations found! Canceling...");
             for(Reservation r : clientReservations) {
+                LOGGER.log(Level.FINEST, "Canceling reservation for product %d", r.getProductID());
+                LOGGER.log(Level.FINEST, "Canceling timer");
                 // cancel timer
                 r.timer.cancel();
                 // update product availability
+                LOGGER.log(Level.FINEST, String.format("Removing reservation for product %d", r.getProductID()));
                 product = getShopProduct(r.getShopID(), r.getProductID());
                 product.removeReservation(r.getQuantity());
+                LOGGER.log(Level.FINEST, String.format("Reservation with %d quantity removed", r.getQuantity()));
             }
+            LOGGER.log(Level.FINER, "All reservations removed, removing client reservation list");
             this.reservations.remove(clientID);
+            LOGGER.log(Level.FINER, "Done! All all client reservations are now removed.");
             return true;
         }
-
+        LOGGER.log(Level.FINER, String.format("Client %d has no active reservations", clientID));
         return false;
     }
 
     @Override
     public Reservation findClientReservation(int clientID, int shopID, int productID) throws RemoteException {
+        LOGGER.log(Level.FINER, String.format("Request to find client reservation, CID: %d, SID: %d, PID: %d",
+                clientID, shopID, productID));
         Reservation r = getClientReservation(clientID, shopID, productID);
         if(r != null) {
+            LOGGER.log(Level.FINER, "Found! Creating a copy and sending it back!");
             return new Reservation(r.getClientID(), r.getShopID(), r.getProductID(), r.getQuantity());
         } else {
+            LOGGER.log(Level.FINER, "Not found, this reservation doesn't exist!");
             return null;
         }
     }
@@ -703,7 +796,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
     public boolean sendBuyToReplica(int shopID, int productID, int quantity) {
         LOGGER.log(Level.FINEST, String.format("Received a buy from the main replica for shop %d, product %d, quantity %d",
                 shopID, productID, quantity));
-        LOGGER.log(Level.FINEST, String.format("Getting product from shop"));
+        LOGGER.log(Level.FINEST, "Getting product from shop");
         Product product = getShopProduct(shopID, productID);
         LOGGER.log(Level.FINEST, "Updating product");
         boolean result = product.sale(quantity);
