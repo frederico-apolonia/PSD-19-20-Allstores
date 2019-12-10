@@ -54,7 +54,7 @@ public class Client {
 			byte[] bp = zooKeeper.getData("/app/".concat(znode), false, null);
 			return new String(bp);
 
-		} catch (Exception e) { System.out.println(e.getMessage()); }
+		} catch (Exception e) { e.printStackTrace(); }
 		return null;
 	}
 
@@ -64,8 +64,7 @@ public class Client {
 	 * @requires appServer != null
 	 * @return
 	 */
-	public static AllStoresServerInterface connectToAppServer(String appServer)
-			throws RemoteException, NotBoundException {
+	public static AllStoresServerInterface connectToAppServer(String appServer) throws RemoteException, NotBoundException {
 
 		String[] appServerSplit = appServer.split(":");
 		assert appServerSplit.length == 2;
@@ -73,8 +72,12 @@ public class Client {
 		int port = Integer.parseInt(appServerSplit[1]);
 
 		// getting the registry and looking up the registry for the remote object
-		Registry registry = LocateRegistry.getRegistry(host, port);
-		return (AllStoresServerInterface) registry.lookup(ALLSTORES_REGISTRY_NAME);
+		Registry registry = null;
+		AllStoresServerInterface result = null;
+		registry = LocateRegistry.getRegistry(host, port);
+		result = (AllStoresServerInterface) registry.lookup(ALLSTORES_REGISTRY_NAME);
+
+		return result;
 	}
 
 	public static void main(String[] args) throws Exception {

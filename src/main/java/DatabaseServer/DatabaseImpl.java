@@ -134,12 +134,10 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
             if (watchedEvent.getType() == Watcher.Event.EventType.NodeChildrenChanged) {
                 assert watchedEvent.getPath().equals("/db/clients");
                 LOGGER.log(Level.FINE, "Sleeping for 500ms to let the new node finish his setup");
-                try
-                {
+                try {
                     Thread.sleep(500);
                 }
-                catch(InterruptedException ex)
-                {
+                catch(InterruptedException ex) {
                     // https://www.javaspecialists.eu/archive/Issue056.html
                     Thread.currentThread().interrupt();
                 }
@@ -573,7 +571,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
                 }
                 LOGGER.log(Level.FINEST, "Reservation successfully canceled!");
             }
-        }, 1000*1000);
+        }, 15*1000);
     }
 
     @Override
@@ -737,11 +735,10 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
     @Override
     public List<Reservation> getClientReservations(int clientID) throws RemoteException {
         LOGGER.log(Level.FINER, String.format("Request for all client %d reservations", clientID));
-        List<Reservation> result = null;
+        List<Reservation> result = new ArrayList<>();
         if(this.reservations.containsKey(clientID)) {
             LOGGER.log(Level.FINER, String.format("Found reservations for client %d", clientID));
             LOGGER.log(Level.FINER, "Copying reservations to an ArrayList...");
-            result = new ArrayList<>();
             for(Reservation r : this.reservations.get(clientID)) {
                 LOGGER.log(Level.FINEST, String.format("Copying reservation for shop %d, product %d and quantity %d",
                         r.getShopID(), r.getProductID(), r.getQuantity()));
@@ -750,7 +747,7 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
 
         }
         LOGGER.log(Level.FINER, String.format("Complete! Found %d reservations for client %d",
-                result == null ? 0 : result.size() ,clientID));
+                result.size() ,clientID));
         return result;
     }
 

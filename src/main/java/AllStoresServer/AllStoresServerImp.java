@@ -11,6 +11,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Array;
+import java.rmi.AccessException;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
@@ -126,24 +127,29 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 	 * Connects to DBServer given a znode data
 	 */
 	private IDataBase connectToDatabaseServer(String address) {
+		assert address != null;
+
+		String[] data = address.split(":");
+		assert data.length == 2;
+
+		String databaseHost = data[0];
+		int databasePort = Integer.parseInt(data[1]);
 
 		try {
-			String[] data = address.split(":");
-			assert data.length == 2;
-
-			String databaseHost = data[0];
-			int databasePort = Integer.parseInt(data[1]);
-
 			Registry registry = LocateRegistry.getRegistry(databaseHost, databasePort);
 			return (IDataBase) registry.lookup("AllstoresDatabaseServer");
 
-		} catch (Exception e) {
-			e.printStackTrace();
+		} catch (AccessException e) {
+			System.err.println("No access to execute the lookup method");
+		} catch (RemoteException e) {
+			System.err.println("Error while connecting to server! (Maybe it's offline?)");
+		} catch (NotBoundException e) {
+			System.err.println("No server found on the registry!");
 		}
-
 		return null;
 	}
 
+	@Override
 	public String addReservation(int storeID, int productID, int quantity, int clientID) throws RemoteException {
 		String databaseServer;
 		IDataBase connectionDB;
@@ -153,8 +159,6 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 			databaseServer = findDatabaseServer(storeID);
 			connectionDB = connectToDatabaseServer(databaseServer);
 
-			// find the product
-			assert connectionDB != null;
 			Product product = getProductFromList(connectionDB.getShopProducts(storeID), productID);
 			if(product != null) {
 				// verify if there is enough quantity to reserve
@@ -180,55 +184,61 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 					}
 					int remainingAvailable = product.getAvailable() - quantity;
 					message.append(String.format("Remaining stock: %d", remainingAvailable));
-					return message.toString();
-					// not enough stock to fulfill this reservation request
 				}  else {
+					// not enough stock to fulfill this reservation request
 					message.append("There's no available stock to fulfill your request.");
 					message.append(String.format("Remaining stock: %d", product.getAvailable()));
-					return message.toString();
 				}
+			} else {
+				message.append(String.format("Product %d doesn't exist", productID));
 			}
-			return message.append(String.format("Product %d doesn't exist", productID)).toString();
 
-		} catch (Exception e) {
-			System.err.println("Something happened while exchanging messages with the DB Server!");
-			e.printStackTrace();
-			message.append("error");
+		} catch (NullPointerException e) {
+			// if Null Pointer is thrown, call the function again. The server might have gone down
+			// let the DBs notice and reorganize
+			try {
+				Thread.sleep(500);
+			}
+			catch(InterruptedException ex) {
+				// https://www.javaspecialists.eu/archive/Issue056.html
+				Thread.currentThread().interrupt();
+			}
+			return addReservation(storeID, productID, quantity, clientID);
 		}
 		return message.toString();
 	}
 
-
+	@Override
 	public List<String> cancel(int clientID) throws RemoteException {
 		IDataBase connectionDB;
 		boolean result = false;
 		List<String> returnReserves = new ArrayList<>();
 
-		try {
-			List<Integer> dbServersKeys = new ArrayList<>(this.dbServers.keySet());
-			for (int i = 0; i < dbServersKeys.size(); i++) {
-				// goes thru each database server and removes all reservations associated with this client
-				connectionDB = connectToDatabaseServer(this.dbServers.get(dbServersKeys.get(i)));
+		List<Integer> dbServersKeys = new ArrayList<>(this.dbServers.keySet());
 
-				assert connectionDB != null;
-				List<Reservation> clientReservations = connectionDB.getClientReservations(clientID);
-				if(clientReservations == null) {
-					continue;
-				}
+		List<Reservation> clientReservations;
+		for (int i = 0; i < dbServersKeys.size(); i++) {
+			// goes thru each database server and removes all reservations associated with this client
+			connectionDB = connectToDatabaseServer(this.dbServers.get(dbServersKeys.get(i)));
+
+			try {
+				clientReservations = connectionDB.getClientReservations(clientID);
 
 				if(clientReservations.size() != 0) {
+					List<String> tmpReserves = new ArrayList<>();
 					for (Reservation r : clientReservations) {
-						returnReserves.add(String.format("Product ID %d: canceled %d products.", r.getProductID(),
+						tmpReserves.add(String.format("Product ID %d: canceled %d products.", r.getProductID(),
 								r.getQuantity()));
 					}
-					result = connectionDB.cancelAllReservations(clientID);
+					if(connectionDB.cancelAllReservations(clientID)) {
+						returnReserves.addAll(tmpReserves);
+					} else {
+						returnReserves.add("ERROR");
+					}
 				}
-			} 
-		} catch (NullPointerException e) {
-			returnReserves.add("Error");
-		} catch (Exception e) {
-			System.err.println("Error while connecting to Database Server");
-			e.printStackTrace();
+			} catch (NullPointerException e) {
+				System.err.println(String.format("Error while connecting to database %s", dbServersKeys.get(i)));
+			}
 		}
 
 		return returnReserves;
@@ -240,24 +250,29 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 		// <storeID>
 		String databaseServer;
 		IDataBase connectionDB;
-		List<String> stockList = new ArrayList<String>();
+		List<String> result = new ArrayList<>();
 
+		databaseServer = findDatabaseServer(storeID);
+		connectionDB = connectToDatabaseServer(databaseServer);
 		try {
-			databaseServer = findDatabaseServer(storeID);
-			connectionDB = connectToDatabaseServer(databaseServer);
-
-			assert connectionDB != null;
-			List<Product> listaProd = connectionDB.getShopProducts(storeID); // vai buscar a lista de produtos da loja
+			List<Product> shopProducts = connectionDB.getShopProducts(storeID); // vai buscar a lista de produtos da loja
 			// pedida
-			for (Product p : listaProd) {
-				stockList.add(p.toString()); // para cada produto na lista vai buscar a sua informação completa (String)
+			for (Product p : shopProducts) {
+				result.add(p.toString()); // para cada produto na lista vai buscar a sua informação completa (String)
 			}
-			return stockList;
-		} catch (Exception e) {
-			System.err.println("Erro na conexão entre o ServerInTheMiddle e a BD!");
-			e.printStackTrace();
+		} catch (NullPointerException e) {
+			// if Null Pointer is thrown, call the function again. The server might have gone down
+			// let the DBs notice and reorganize
+			try {
+				Thread.sleep(500);
+			}
+			catch(InterruptedException ex) {
+				// https://www.javaspecialists.eu/archive/Issue056.html
+				Thread.currentThread().interrupt();
+			}
+			return getList(storeID);
 		}
-		return stockList;
+		return result;
 	}
 
 
@@ -324,9 +339,17 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 				sb.append("ERROR! The product that you're trying to buy doesn't exist!");
 			}
 
-		} catch (Exception e) {
-			sb.append("Error while connecting to the Database server, try again later.");
-			e.printStackTrace();
+		} catch (NullPointerException e) {
+			// if Null Pointer is thrown, call the function again. The server might have gone down
+			// let the DBs notice and reorganize
+			try {
+				Thread.sleep(500);
+			}
+			catch(InterruptedException ex) {
+				// https://www.javaspecialists.eu/archive/Issue056.html
+				Thread.currentThread().interrupt();
+			}
+			return buy(clientID, storeID, productID, quantity);
 		}
 		return sb.toString();
 	}
@@ -347,34 +370,26 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 		IDataBase connectionDB;
 		List<String> soldList = new ArrayList<String>();
 
-		try {
-			int dbServers = this.dbServers.size();
-			for (int i = 1; i <= dbServers; i++) {
-				connectionDB = connectToDatabaseServer(this.dbServers.get(i));
+		int dbServers = this.dbServers.size();
+		for (int i = 1; i <= dbServers; i++) {
+			connectionDB = connectToDatabaseServer(this.dbServers.get(i));
 
-				assert connectionDB != null;
-				List<Reservation> reservedList = connectionDB.getClientReservations(clientID);
+			List<Reservation> reservedList = connectionDB.getClientReservations(clientID);
 
-				if (reservedList != null) {
-					for (Reservation r : reservedList) { // para cada reserva do cliente, efetua a compra
-						int prod = r.getProductID();
-						int qnt = r.getQuantity();
+			if (reservedList != null) {
+			for (Reservation r : reservedList) { // para cada reserva do cliente, efetua a compra
+				int prod = r.getProductID();
+				int qnt = r.getQuantity();
 
-						connectionDB.buyProduct(r.getShopID(), r.getProductID(), r.getQuantity(), clientID);
+				connectionDB.buyProduct(r.getShopID(), r.getProductID(), r.getQuantity(), clientID);
 
-						String info = "Produto " + prod + ", " + qnt + "unidades.";
-						soldList.add(info);
-					}
-				} else {
-					soldList.add(" ");
-				}
+				String info = "Produto " + prod + ", " + qnt + "unidades.";
+				soldList.add(info);
 			}
-			return soldList;
-		} catch (Exception e) {
-			System.err.println("Error na conexão entre o ServerInTheMiddle e a BD!");
-			e.printStackTrace();
+		} else {
+			soldList.add(" ");
 		}
-		soldList.add("error");
+	}
 		return soldList;
 	}
 }

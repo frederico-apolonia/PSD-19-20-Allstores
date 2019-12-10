@@ -40,7 +40,7 @@ public class TrafficGeneratorPerformanceMonitoring {
 		int trafficTime;
 	}
 
-	private class ThreadResult extends Thread {
+	private class ThreadResult {
 		int actionCount = 0;
 		int replyCount = 0;
 		int unavailableCount = 0;
@@ -55,8 +55,7 @@ public class TrafficGeneratorPerformanceMonitoring {
 		private AllStoresServerInterface allStoresServer;
 		private ZooKeeper zooKeeper;
 		private ThreadResult result = new ThreadResult();
-		private String randomAppServer, host;
-		private int port;
+		private String randomAppServer;
 
 		ClientThread(boolean writeMode, int singleStore, int clientID) throws IOException, InterruptedException {
 			this.writeMode = writeMode;
@@ -79,33 +78,40 @@ public class TrafficGeneratorPerformanceMonitoring {
 			Random rnd = new Random();
 			String actionResult;
 			boolean randomStores = singleStore == -1;
-			try {
+
 				while (!stopThreads) {
 					// get random app server so that we're not always pinging the same one
 					randomAppServer = Client.getRandomAppServer(zooKeeper);
 					assert randomAppServer != null;
-					allStoresServer = Client.connectToAppServer(randomAppServer);
-
+					try {
+						allStoresServer = Client.connectToAppServer(randomAppServer);
+					} catch (Exception e) {
+						continue;
+					}
 					product = rnd.nextInt(ALLSTORES_MAX_PRODUCTID) + 1;
 					if (randomStores) {
 						// random store
 						store = rnd.nextInt(ALLSTORES_MAX_SHOPID) + 1;
 					}
-					if (writeMode) {
-						start = System.currentTimeMillis();
-						Client.reserve(this.allStoresServer, this.clientID, store, product,
-								BUY_RESERVE_QUANTITY);
-						actionResult = Client.buy(this.allStoresServer, this.clientID, store, product,
-								BUY_RESERVE_QUANTITY);
+					start = System.currentTimeMillis();
+					try {
+						if (writeMode) {
+							Client.reserve(this.allStoresServer, this.clientID, store, product,
+									BUY_RESERVE_QUANTITY);
+							actionResult = Client.buy(this.allStoresServer, this.clientID, store, product,
+									BUY_RESERVE_QUANTITY);
+
+						} else {
+							actionResult = Client.reserve(this.allStoresServer, this.clientID, store, product,
+									BUY_RESERVE_QUANTITY);
+							Client.cancel(this.allStoresServer, this.clientID);
+						}
+					} catch (Exception e) {
+						actionResult = "error";
+					} finally {
 						end = System.currentTimeMillis();
-					} else {
-						start = System.currentTimeMillis();
-						actionResult = Client.reserve(this.allStoresServer, this.clientID, store, product,
-								BUY_RESERVE_QUANTITY);
-						Client.cancel(this.allStoresServer, this.clientID);
-						end = System.currentTimeMillis();
+						this.result.actionCount++;
 					}
-					this.result.actionCount++;
 
 					if (!actionResult.toLowerCase().contains("busy") && !actionResult.toLowerCase().contains("error")) {
 						this.result.replyCount++;
@@ -117,9 +123,7 @@ public class TrafficGeneratorPerformanceMonitoring {
 
 				}
 
-			} catch (RemoteException | NotBoundException e) {
-				e.printStackTrace();
-			}
+
 		}
 
 		@Override
@@ -137,14 +141,8 @@ public class TrafficGeneratorPerformanceMonitoring {
 		TrafficGeneratorPerformanceMonitoring tgpm = new TrafficGeneratorPerformanceMonitoring();
 		try {
 			tgpm.runClients(options);
-		} catch (RemoteException e) {
-			e.printStackTrace();
-		} catch (NotBoundException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}catch (InterruptedException e) {
-			e.printStackTrace();
+		} catch (Exception e) {
+			// do nothing
 		}
 	}
 
@@ -166,6 +164,7 @@ public class TrafficGeneratorPerformanceMonitoring {
 
 		// 1 sec clock for visual updates
 		Timer visualUpdateTimer = new Timer();
+		final List<ThreadResult>[] previousResults = new List[]{new ArrayList<>()};
 		visualUpdateTimer.schedule(new TimerTask() {
 			@Override
 			public void run() {
@@ -180,7 +179,16 @@ public class TrafficGeneratorPerformanceMonitoring {
 					}
 				}
 
-				printProgress(updateResults);
+				printProgress(updateResults, previousResults[0]);
+				previousResults[0] = new ArrayList<>();
+				for (ThreadResult tr : updateResults) {
+					ThreadResult tmp = new ThreadResult();
+					tmp.actionCount = tr.actionCount;
+					tmp.replyCount = tr.replyCount;
+					tmp.unavailableCount = tr.unavailableCount;
+					tmp.timeSum = tr.timeSum;
+					previousResults[0].add(tmp);
+				}
 
 			}
 		}, 1000, 1000);
@@ -190,12 +198,14 @@ public class TrafficGeneratorPerformanceMonitoring {
 		trafficTimeTimer.schedule(new TimerTask() {
 			@Override
 			public void run() {
+				elapsedTime++;
 				visualUpdateTimer.cancel();
 				stopThreads = true;
 
 				for (ClientThread ct : threads) {
 					try {
 						results.add(ct.call());
+						ct.join();
 					} catch (Exception e) {
 						e.printStackTrace();
 					}
@@ -207,20 +217,28 @@ public class TrafficGeneratorPerformanceMonitoring {
 
 	}
 
-	private void printProgress(List<ThreadResult> updateResults) {
+	private void printProgress(List<ThreadResult> updateResults, List<ThreadResult> previousResults) {
 		double totalNumberRequests = 0, completedRequests = 0, unavailableRequests = 0;
 		long totalLatency = 0;
-		for (ThreadResult tr : updateResults) {
-			totalNumberRequests += tr.actionCount;
-			completedRequests += tr.replyCount;
-			unavailableRequests += tr.unavailableCount;
-			totalLatency += tr.timeSum;
-		}
+		for (int i = 0; i < updateResults.size(); i++) {
+			ThreadResult current = updateResults.get(i);
+			ThreadResult currentPrevious;
+			if(previousResults.size() == 0) {
+				currentPrevious= new ThreadResult();
+				currentPrevious.timeSum = 0;
+			} else {
+				currentPrevious = previousResults.get(i);
+			}
 
+			totalNumberRequests += (current.actionCount - currentPrevious.actionCount);
+			completedRequests += (current.replyCount - currentPrevious.replyCount);
+			unavailableRequests += (current.unavailableCount - currentPrevious.unavailableCount);
+			totalLatency += (current.timeSum - currentPrevious.timeSum);
+		}
 		double fulfilledRate = ((totalNumberRequests - unavailableRequests) / completedRequests);
 		System.out.println(String.format(
 				"ET: %d seconds T: %.2f op/s AL: %.2f ms FR: %.2f%%",
-				elapsedTime, (completedRequests / elapsedTime), (totalLatency / totalNumberRequests), fulfilledRate));
+				elapsedTime, completedRequests, (totalLatency / totalNumberRequests), fulfilledRate));
 
 	}
 
@@ -228,18 +246,13 @@ public class TrafficGeneratorPerformanceMonitoring {
 		int totalNumberRequests = 0, completedRequests = 0, unavailableRequests = 0;
 
 		for (ThreadResult tr : results) {
-			try {
-				tr.join();
-				totalNumberRequests += tr.actionCount;
-				completedRequests += tr.replyCount;
-				unavailableRequests += tr.unavailableCount;
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
+			totalNumberRequests += tr.actionCount;
+			completedRequests += tr.replyCount;
+			unavailableRequests += tr.unavailableCount;
 		}
 
-		double fulfilledRate = ((totalNumberRequests - unavailableRequests) / totalNumberRequests);
-		double completionRate = ((totalNumberRequests - completedRequests) / totalNumberRequests);
+		double fulfilledRate = ((totalNumberRequests - unavailableRequests) / totalNumberRequests) * 100;
+		double completionRate = (completedRequests / totalNumberRequests) * 100;
 		double throughput = completedRequests / elapsedTime;
 
 		System.out.println("***************************************************");
