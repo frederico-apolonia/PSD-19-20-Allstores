@@ -120,7 +120,8 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         // creates sales log file
         LOGGER.log(Level.FINE, "Creating log file");
         new File(logPath).createNewFile();
-        writeStoresToDisk(this.shops, this.serverPath);
+        ShopWriter sw = new ShopWriter(serverPath, new HashMap<>(this.shops));
+        sw.start();
 
         updateFirstLastShop();
 
@@ -393,36 +394,6 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
         this.shops.put(shopID, currShopProds);
     }
 
-    /**
-     * Writes all stores to disk
-     */
-    private void writeStoresToDisk(HashMap<Integer, List<Product>> shops, String path) throws IOException {
-        LOGGER.log(Level.FINER, "Writing shops to disk...");
-        for (int shop : shops.keySet()) {
-            writeStoreToDisk(shop, this.shops.get(shop), path);
-        }
-        LOGGER.log(Level.FINER, "Complete! All shops written to disk!");
-    }
-
-    /**
-     * Write a store to disk on file <storeID>.shop
-     * @param shopID
-     * @param products
-     */
-    private void writeStoreToDisk(int shopID, List<Product> products, String path) throws IOException {
-        LOGGER.log(Level.FINER, String.format("Writing shop %d to disk", shopID));
-        String shopPath = path + shopID + ".shop";
-        BufferedWriter writer = new BufferedWriter(new FileWriter(shopPath, false));
-        for(Product p : products) {
-            LOGGER.log(Level.FINEST, String.format("Writing product %d with %d available and %d sold",
-                    p.getProductID(), p.getAvailable(), p.getSold()));
-            writer.write(String.format("%d %d %d\n", p.getProductID(), p.getAvailable(), p.getSold()));
-        }
-        writer.flush();
-        writer.close();
-        LOGGER.log(Level.FINER, String.format("Complete! Wrote shop %d to disk", shopID));
-    }
-
     private boolean writeBuyToLog(int shopID, int productID, int quantity) throws IOException {
 
         File logFile = new File(logPath);
@@ -432,7 +403,10 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
                 double fileSize = logFile.length();
                 // if file size is larger than 100000 bytes (100KB) then it's time to write the stores to disk
                 if(fileSize > 100000) {
-                    writeStoresToDisk(this.shops, this.serverPath);
+                    HashMap<Integer, List<Product>> shopsClone = new HashMap<>();
+                    shopsClone.putAll(this.shops);
+                    ShopWriter sw = new ShopWriter(this.serverPath, shopsClone);
+                    sw.start();
                     fileWriter = new FileWriter(this.logPath, false);
                     // guarantee that it is now empty
                     fileWriter.write("");
@@ -816,12 +790,9 @@ public class DatabaseImpl extends UnicastRemoteObject implements IDataBase {
     public synchronized void updateDatabase(HashMap<Integer, List<Product>> shops) {
         LOGGER.log(Level.FINE, String.format("Received a HashMap with %d shops", shops.size()));
         this.shops.putAll(shops);
-        try {
-            LOGGER.log(Level.FINE, "Writing new shops to disk!");
-            writeStoresToDisk(this.shops, this.serverPath);
-            LOGGER.log(Level.FINE, "Complete! All stores written");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        LOGGER.log(Level.FINE, "Writing new shops to disk!");
+        ShopWriter sw = new ShopWriter(this.serverPath, new HashMap<>(this.shops));
+        sw.start();
+        LOGGER.log(Level.FINE, "Complete! All stores written");
     }
 }
