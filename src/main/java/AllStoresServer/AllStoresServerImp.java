@@ -288,51 +288,55 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 			Product product = getProductFromList(connectionDB.getShopProducts(storeID), productID);
 
 			if(product != null) {
-				// verifica se o cliente já tem reservas desse produto e
-				// se tiver, verifica se é em menor ou maior quantidade da pretendida
-				Reservation reservedProduct = connectionDB.findClientReservation(clientID, storeID, productID);
+				if (product.getAvailable() == 0) {
+					sb.append("Unfulfilled");
+				} else {
+					// verifica se o cliente já tem reservas desse produto e
+					// se tiver, verifica se é em menor ou maior quantidade da pretendida
+					Reservation reservedProduct = connectionDB.findClientReservation(clientID, storeID, productID);
 
-				// cliente tem reserva
-				if (reservedProduct != null) {
-					int shopRemainingAvailable = product.getAvailable();
-					int reservationRemainingAvailable = reservedProduct.getQuantity() - quantity;
-					// se qnt reservado > qnt, compra o produto e atualiza a reserva
-					if (reservedProduct.getQuantity() > quantity) {
-
-						if (connectionDB.buyProduct(storeID, productID, quantity, clientID)) {
-							sb.append(String.format("Product bought with success! You still have %d reserved units and there " +
-									"are %d units available on the shop.",reservationRemainingAvailable, shopRemainingAvailable));
-						} else {
-							sb.append("Something happened while your product was being bought. Try again later.");
-						}
-
-					} else { // se qnt reservado <= qnt, verifica se há a diferença em loja
-						if (quantity - reservedProduct.getQuantity() <= product.getAvailable()) {
+					// cliente tem reserva
+					if (reservedProduct != null) {
+						int shopRemainingAvailable = product.getAvailable();
+						int reservationRemainingAvailable = reservedProduct.getQuantity() - quantity;
+						// se qnt reservado > qnt, compra o produto e atualiza a reserva
+						if (reservedProduct.getQuantity() > quantity) {
 
 							if (connectionDB.buyProduct(storeID, productID, quantity, clientID)) {
-								sb.append(String.format("Product bought with success! You have 0 reserved units and there" +
-										" are %d units available on the shop.",shopRemainingAvailable));
+								sb.append(String.format("Product bought with success! You still have %d reserved units and there " +
+										"are %d units available on the shop.",reservationRemainingAvailable, shopRemainingAvailable));
 							} else {
 								sb.append("Something happened while your product was being bought. Try again later.");
 							}
 
+						} else { // se qnt reservado <= qnt, verifica se há a diferença em loja
+							if (quantity - reservedProduct.getQuantity() <= product.getAvailable()) {
+
+								if (connectionDB.buyProduct(storeID, productID, quantity, clientID)) {
+									sb.append(String.format("Product bought with success! You have 0 reserved units and there" +
+											" are %d units available on the shop.",shopRemainingAvailable));
+								} else {
+									sb.append("Something happened while your product was being bought. Try again later.");
+								}
+
+							} else {
+								sb.append(String.format("ERROR! You're trying to buy more than what's available! There's %d available " +
+										"units reserved and there are %d products in stock.", reservedProduct.getQuantity(), product.getAvailable()));
+							}
+						}
+
+					} else { // se não tiver nenhuma reserva desse produto, verifica se existe a quantidade
+						// em loja e efetua ou não a compra
+						if (quantity <= product.getAvailable()) {
+
+							if(connectionDB.buyProduct(storeID, productID, quantity, clientID)) {
+								sb.append(String.format("Product bought with success! Number of remaining units: %d ", product.getAvailable()));
+							}
+
 						} else {
-							sb.append(String.format("ERROR! You're trying to buy more than what's available! There's %d available " +
-									"units reserved and there are %d products in stock.", reservedProduct.getQuantity(), product.getAvailable()));
+							sb.append(String.format("ERROR! You're trying to buy more than what's currently available! There " +
+									"are %d units left in stock", product.getAvailable()));
 						}
-					}
-
-				} else { // se não tiver nenhuma reserva desse produto, verifica se existe a quantidade
-					// em loja e efetua ou não a compra
-					if (quantity <= product.getAvailable()) {
-
-						if(connectionDB.buyProduct(storeID, productID, quantity, clientID)) {
-							sb.append(String.format("Product bought with success! Number of remaining units: %d ", product.getAvailable()));
-						}
-
-					} else {
-						sb.append(String.format("ERROR! You're trying to buy more than what's currently available! There " +
-								"are %d units left in stock", product.getAvailable()));
 					}
 				}
 			} else {
@@ -377,19 +381,19 @@ public class AllStoresServerImp extends UnicastRemoteObject implements AllStores
 			List<Reservation> reservedList = connectionDB.getClientReservations(clientID);
 
 			if (reservedList != null) {
-			for (Reservation r : reservedList) { // para cada reserva do cliente, efetua a compra
-				int prod = r.getProductID();
-				int qnt = r.getQuantity();
+				for (Reservation r : reservedList) { // para cada reserva do cliente, efetua a compra
+					int prod = r.getProductID();
+					int qnt = r.getQuantity();
 
-				connectionDB.buyProduct(r.getShopID(), r.getProductID(), r.getQuantity(), clientID);
+					connectionDB.buyProduct(r.getShopID(), r.getProductID(), r.getQuantity(), clientID);
 
-				String info = "Produto " + prod + ", " + qnt + "unidades.";
-				soldList.add(info);
+					String info = "Produto " + prod + ", " + qnt + "unidades.";
+					soldList.add(info);
+				}
+			} else {
+				soldList.add(" ");
 			}
-		} else {
-			soldList.add(" ");
 		}
-	}
 		return soldList;
 	}
 }

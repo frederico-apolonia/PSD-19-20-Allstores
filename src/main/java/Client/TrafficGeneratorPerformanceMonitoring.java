@@ -235,7 +235,7 @@ public class TrafficGeneratorPerformanceMonitoring {
 			unavailableRequests += (current.unavailableCount - currentPrevious.unavailableCount);
 			totalLatency += (current.timeSum - currentPrevious.timeSum);
 		}
-		double fulfilledRate = ((totalNumberRequests - unavailableRequests) / completedRequests);
+		double fulfilledRate = ((completedRequests - unavailableRequests) / totalNumberRequests) * 100;
 		System.out.println(String.format(
 				"ET: %d seconds T: %.2f op/s AL: %.2f ms FR: %.2f%%",
 				elapsedTime, completedRequests, (totalLatency / totalNumberRequests), fulfilledRate));
@@ -251,7 +251,7 @@ public class TrafficGeneratorPerformanceMonitoring {
 			unavailableRequests += tr.unavailableCount;
 		}
 
-		double fulfilledRate = ((totalNumberRequests - unavailableRequests) / totalNumberRequests) * 100;
+		double fulfilledRate = (completedRequests / totalNumberRequests) * 100;
 		double completionRate = (completedRequests / totalNumberRequests) * 100;
 		double throughput = completedRequests / elapsedTime;
 
