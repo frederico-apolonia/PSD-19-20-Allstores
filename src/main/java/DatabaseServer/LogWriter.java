@@ -21,6 +21,7 @@ public class LogWriter extends Thread {
             FileWriter fileWriter = new FileWriter(logPath, true);
             fileWriter.append(String.format("%d %d %d\n", shopID, productID, quantity));
             fileWriter.flush();
+            fileWriter.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
